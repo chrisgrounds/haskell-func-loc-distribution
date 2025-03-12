@@ -70,11 +70,11 @@ with open('out.json', 'w') as f:
 top_20_functions = dict(list(loc_counts.items())[:20])
 
 plt.figure(figsize=(15, 8))
-plt.bar(range(len(top_20_functions)), list(top_20_functions.values()))
-plt.xticks(range(len(top_20_functions)), list(top_20_functions.keys()), rotation=45, ha='right')
-plt.xlabel('Function Names')
-plt.ylabel('Lines of Code')
-plt.title('Lines of Code per Function (Top 20)')
+plt.hist(list(loc_counts.values()), bins=range(1, max(loc_counts.values()) + 2), align='left')
+plt.xlabel('Lines of Code')
+plt.ylabel('Number of Functions')
+plt.title('Distribution of Function Sizes')
+plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
 
