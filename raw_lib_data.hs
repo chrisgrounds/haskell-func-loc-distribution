@@ -1,32 +1,3 @@
-module Data.Aeson.Decoding (
-    decode,
-    eitherDecode,
-    throwDecode,
-    decodeStrict,
-    eitherDecodeStrict,
-    throwDecodeStrict,
-    decodeStrictText,
-    eitherDecodeStrictText,
-    throwDecodeStrictText,
-    toEitherValue,
-    unescapeText,
-) where
-
-import           Control.Monad.Catch                 (MonadThrow (..))
-import           Data.Aeson.Types.Internal           (AesonException (..), formatError)
-
-import qualified Data.Aeson.Types                    as A
-import qualified Data.ByteString                     as BS
-import qualified Data.ByteString.Lazy                as LBS
-import qualified Data.Text                           as T
-
-import           Data.Aeson.Decoding.ByteString
-import           Data.Aeson.Decoding.ByteString.Lazy
-import           Data.Aeson.Decoding.Text
-import           Data.Aeson.Decoding.Conversion
-import           Data.Aeson.Internal.Unescape        (unescapeText)
-
-
 decodeStrict :: (A.FromJSON a) => BS.ByteString -> Maybe a
 decodeStrict bs = unResult (toResultValue (bsToTokens bs)) (\_ -> Nothing) $ \v bs' -> case A.ifromJSON v of
     A.ISuccess x
@@ -91,27 +62,6 @@ throwDecodeStrictText bs = unResult (toResultValue (textToTokens bs)) (throwM . 
         | textSpace bs' -> pure x
         | otherwise     -> throwM $ AesonException "Trailing garbage"
     A.IError path msg   -> throwM $ AesonException $ formatError path msg
-
-module Data.Aeson.Decoding.ByteString (
-    bsToTokens,
-) where
-
-import           Data.ByteString              (ByteString)
-import           Data.Char                    (chr)
-import           Data.Integer.Conversion      (byteStringToInteger)
-import           Data.Text                    (Text)
-import           Data.Word                    (Word8)
-
-import qualified Data.Aeson.Key               as Key
-import qualified Data.ByteString              as BS
-import qualified Data.ByteString.Unsafe       as BS.Unsafe
-import qualified Data.Scientific              as Sci
-import qualified Data.Word8.Patterns          as W8
-
-import           Data.Aeson.Decoding.Internal
-import           Data.Aeson.Decoding.Tokens
-import           Data.Aeson.Internal.Text     (unsafeDecodeASCII)
-import           Data.Aeson.Internal.Unescape (unescapeText)
 
 bsToTokens :: ByteString -> Tokens ByteString String
 bsToTokens bs0 = goT bs0 id where
@@ -326,27 +276,6 @@ scanNumberLiteral kont err bs0 = state_start bs0 where
 
     errEnd    = err "Unexpected end-of-input while parsing number literal"
     errUnx w8 = err $ "Unexpected " ++ show (chr (fromIntegral w8)) ++ " while parsing number literal"
-
-module Data.Aeson.Decoding.ByteString.Lazy (
-    lbsToTokens,
-) where
-
-import           Data.ByteString.Lazy         (ByteString)
-import           Data.Char                    (chr)
-import           Data.Integer.Conversion      (byteStringToInteger)
-import           Data.Text                    (Text)
-import           Data.Word                    (Word8)
-
-import qualified Data.Aeson.Key               as Key
-import qualified Data.ByteString              as BS
-import qualified Data.ByteString.Lazy         as LBS
-import qualified Data.Scientific              as Sci
-import qualified Data.Word8.Patterns          as W8
-
-import           Data.Aeson.Decoding.Internal
-import           Data.Aeson.Decoding.Tokens
-import           Data.Aeson.Internal.Text     (unsafeDecodeASCII)
-import           Data.Aeson.Internal.Unescape (unescapeText)
 
 lbsToTokens :: ByteString -> Tokens ByteString String
 lbsToTokens bs0 = goT bs0 id where
@@ -567,37 +496,6 @@ scanNumberLiteral kont err bs0 = state_start bs0 where
 
     errEnd    = err "Unexpected end-of-input while parsing number literal"
     errUnx w8 = err $ "Unexpected " ++ show (chr (fromIntegral w8)) ++ " while parsing number literal"
-
-module Data.Aeson.Decoding.Text (
-    textToTokens,
-) where
-
-import           Data.Char                            (chr)
-import           Data.Integer.Conversion              (textToInteger)
-import           Data.Text.Internal                   (Text (..))
-
-import qualified Data.Aeson.Key                       as Key
-import qualified Data.Scientific                      as Sci
-import qualified Data.Text                            as T
-import qualified Data.Text.Array                      as A
-
-import           Data.Aeson.Decoding.Internal
-import           Data.Aeson.Decoding.Tokens
-import           Data.Aeson.Internal.Prelude
-import           Data.Aeson.Internal.UnescapeFromText (unescapeFromText)
-
-#if MIN_VERSION_text(2,0,0)
-import qualified Data.Word8.Patterns as W
-#else
-import qualified Data.Word16.Patterns as W
-#endif
-
-#if MIN_VERSION_text(2,0,0)
-type Point = Word8
-#else
-type Point = Word16
-#endif
-
 
 textToTokens :: Text -> Tokens Text String
 textToTokens bs0 = goT bs0 id where
@@ -824,20 +722,12 @@ unsafeTakePoints n (Text arr off _len) = Text arr off n
 unsafeDropPoints :: Int -> Text -> Text
 unsafeDropPoints n (Text arr off len) = Text arr (off + n) (len - n)
 
-module Data.Aeson.Decoding.Tokens (
     Tokens (..),
     Lit (..),
     Number (..),
     TkArray (..),
     TkRecord (..),
-) where
 
-import           Data.Aeson.Key            (Key)
-import           Data.Bifoldable           (Bifoldable (..))
-import           Data.Bifunctor            (Bifunctor (..))
-import           Data.Bitraversable        (Bitraversable (..), bifoldMapDefault, bimapDefault)
-import           Data.Scientific           (Scientific)
-import           Data.Text                 (Text)
 
 data Tokens k e
     = TkLit !Lit k
@@ -908,7 +798,6 @@ instance Bitraversable TkRecord where
     bitraverse _ g (TkRecordErr e) = TkRecordErr <$> g e
 
 
-module Data.Aeson.Encoding.Internal
     (
       Encoding' (..)
     , Encoding
@@ -956,22 +845,8 @@ module Data.Aeson.Encoding.Internal
     , zonedTime
     , value
     , comma, colon, openBracket, closeBracket, openCurly, closeCurly
-    ) where
 
-import Data.Aeson.Internal.Prelude hiding (empty)
 
-import Data.Aeson.Types.Internal (Value, Key)
-import Data.ByteString.Builder (Builder, char7, toLazyByteString)
-import Data.ByteString.Short (ShortByteString)
-import qualified Data.Aeson.Key as Key
-import Data.Time (Day, LocalTime, TimeOfDay, ZonedTime)
-import Data.Time.Calendar.Month.Compat (Month)
-import Data.Time.Calendar.Quarter.Compat (Quarter)
-import qualified Data.Aeson.Encoding.Builder as EB
-import qualified Data.ByteString.Builder as B
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Short as ST
 
 newtype Encoding' tag = Encoding {
       fromEncoding :: Builder
@@ -1214,7 +1089,6 @@ doubleText d
 scientificText :: Scientific -> Encoding' a
 scientificText = Encoding . EB.quote . EB.scientific
 
-
 day :: Day -> Encoding' a
 day = Encoding . EB.quote . EB.day
 
@@ -1236,41 +1110,8 @@ timeOfDay = Encoding . EB.quote . EB.timeOfDay
 zonedTime :: ZonedTime -> Encoding' a
 zonedTime = Encoding . EB.quote . EB.zonedTime
 
-
 value :: Value -> Encoding
 value = Encoding . EB.encodeToBuilder
-
-
-
-module Data.Aeson.Key (
-    Key,
-    fromString,
-    toString,
-    toText,
-    fromText,
-    coercionToText,
-    toShortText,
-    fromShortText,
-) where
-
-import Prelude (Eq, Ord, (.), Show (..), String, Maybe (..))
-
-import Control.Applicative ((<$>))
-import Control.DeepSeq (NFData(..))
-import Data.Data (Data)
-import Data.Hashable (Hashable(..))
-import Data.Monoid (Monoid(mempty, mappend))
-import Data.Semigroup (Semigroup((<>)))
-import Data.Text (Text)
-import Data.Type.Coercion (Coercion (..))
-import Data.Typeable (Typeable)
-import Text.Read (Read (..))
-
-import qualified Data.String
-import qualified Data.Text as T
-import qualified Data.Text.Short as ST
-import qualified Language.Haskell.TH.Syntax as TH
-import qualified Test.QuickCheck as QC
 
 newtype Key = Key { unKey :: Text }
   deriving (Typeable, Data)
@@ -1295,7 +1136,6 @@ toShortText = ST.fromText . unKey
 
 fromShortText :: ST.ShortText -> Key
 fromShortText = Key . ST.toText
-
 
 instance Read Key where
     readPrec = fromString <$> readPrec
@@ -1343,120 +1183,8 @@ instance QC.CoArbitrary Key where
 instance QC.Function Key where
     function = QC.functionMap toString fromString
 
-
-
-module Data.Aeson.KeyMap (
-    KeyMap,
-
-    null,
-    lookup,
-    (!?),
-    size,
-    member,
-
-    empty,
-    singleton,
-
-    insert,
-    insertWith,
-
-    delete,
-
-    alterF,
-
-    difference,
-    union,
-    unionWith,
-    unionWithKey,
-    intersection,
-    intersectionWith,
-    intersectionWithKey,
-    alignWith,
-    alignWithKey,
-
-    fromList,
-    fromListWith,
-    toList,
-    toAscList,
-    elems,
-
-    fromHashMap,
-    toHashMap,
-    fromHashMapText,
-    toHashMapText,
-    coercionToHashMap,
-    fromMap,
-    toMap,
-    fromMapText,
-    toMapText,
-    coercionToMap,
-
-    map,
-    mapWithKey,
-    mapKeyVal,
-    traverse,
-    traverseWithKey,
-
-    foldr,
-    foldr',
-    foldl,
-    foldl',
-    foldMapWithKey,
-    foldrWithKey,
-
-    keys,
-
-    filter,
-    filterWithKey,
-    mapMaybe,
-    mapMaybeWithKey,
-
-    Key,
-) where
-
-import Prelude (Eq(..), Ord((>)), Int, Bool(..), Maybe(..))
-import Prelude ((.), ($))
-import Prelude (Functor(fmap), Monad(..))
-import Prelude (Show, showsPrec, showParen, shows, showString)
-
-import Control.Applicative (Applicative)
-import Control.DeepSeq (NFData(..))
-import Data.Aeson.Key (Key)
-import Data.Bifunctor (first)
-import Data.Data (Data)
-import Data.Hashable (Hashable(..))
-import Data.HashMap.Strict (HashMap)
-import Data.Map (Map)
-import Data.Monoid (Monoid(mempty, mappend))
-import Data.Semigroup (Semigroup((<>)))
-import Data.Text (Text)
-import Data.These (These (..))
-import Data.Type.Coercion (Coercion (..))
-import Data.Typeable (Typeable)
-import Text.Read (Read (..), Lexeme(..), readListPrecDefault, prec, lexP, parens)
-
-import qualified Data.Aeson.Key as Key
-import qualified Data.Foldable as F
-import qualified Data.Traversable as T
-import qualified Data.HashMap.Strict as H
-import qualified Data.List as L
-import qualified Data.Map.Strict as M
-import qualified Language.Haskell.TH.Syntax as TH
-import qualified Data.Foldable.WithIndex    as WI (FoldableWithIndex (..))
-import qualified Data.Functor.WithIndex     as WI (FunctorWithIndex (..))
-import qualified Data.Traversable.WithIndex as WI (TraversableWithIndex (..))
-import qualified Data.Semialign as SA
-import qualified Data.Semialign.Indexed as SAI
-import qualified GHC.Exts
-import qualified Test.QuickCheck as QC
-import qualified Witherable as W
-
-#ifdef USE_ORDEREDMAP
-
-
 newtype KeyMap v = KeyMap { unKeyMap :: Map Key v }
   deriving (Eq, Ord, Typeable, Data, Functor)
-
 
 empty :: KeyMap v
 empty = KeyMap M.empty
@@ -1594,9 +1322,6 @@ mapMaybeWithKey f (KeyMap m) = KeyMap (M.mapMaybeWithKey f m)
 #else
 
 
-import Data.List (sortBy)
-import Data.Ord (comparing)
-import Prelude (fst)
 
 newtype KeyMap v = KeyMap { unKeyMap :: HashMap Key v }
   deriving (Eq, Ord, Typeable, Data, Functor)
@@ -1874,14 +1599,7 @@ instance QC.CoArbitrary v => QC.CoArbitrary (KeyMap v) where
 instance QC.Function v => QC.Function (KeyMap v) where
     function = QC.functionMap toList fromList
 
-module Data.Aeson.QQ.Simple (aesonQQ) where
 
-import           Data.Aeson
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as TE
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Quote
-import           Language.Haskell.TH.Syntax (Lift (..))
 
 aesonQQ :: QuasiQuoter
 aesonQQ = QuasiQuoter
@@ -1897,183 +1615,8 @@ aesonExp txt =
     Left err  -> error $ "Error in aesonExp: " ++ show err
     Right val -> lift (val :: Value)
 
-
-module Data.Aeson.Types
-    (
-      Value(..)
-    , Key
-    , Encoding
-    , unsafeToEncoding
-    , fromEncoding
-    , Series
-    , Array
-    , emptyArray
-    , Pair
-    , Object
-    , emptyObject
-    , DotNetTime(..)
-    , typeMismatch
-    , unexpected
-    , Parser
-    , Result(..)
-    , FromJSON(..)
-    , fromJSON
-    , parse
-    , parseEither
-    , parseMaybe
-    , parseFail
-    , modifyFailure
-    , prependFailure
-    , parserThrowError
-    , parserCatchError
-    , IResult (..)
-    , ifromJSON
-    , iparse
-    , iparseEither
-    , ToJSON(..)
-    , KeyValue(..)
-    , KeyValueOmit(..)
-
-    , ToJSONKey(..)
-    , ToJSONKeyFunction(..)
-    , toJSONKeyText
-    , toJSONKeyKey
-    , contramapToJSONKeyFunction
-    , FromJSONKey(..)
-    , FromJSONKeyFunction(..)
-    , fromJSONKeyCoerce
-    , coerceFromJSONKeyFunction
-    , mapFromJSONKeyFunction
-
-    , GToJSONKey()
-    , genericToJSONKey
-    , GFromJSONKey()
-    , genericFromJSONKey
-
-    , FromJSON1(..)
-    , parseJSON1
-    , omittedField1
-    , FromJSON2(..)
-    , parseJSON2
-    , omittedField2
-    , ToJSON1(..)
-    , toJSON1
-    , toEncoding1
-    , omitField1
-    , ToJSON2(..)
-    , toJSON2
-    , toEncoding2
-    , omitField2
-
-    , GFromJSON
-    , FromArgs
-    , GToJSON
-    , GToEncoding
-    , GToJSON'
-    , ToArgs
-    , Zero
-    , One
-    , genericToJSON
-    , genericLiftToJSON
-    , genericToEncoding
-    , genericLiftToEncoding
-    , genericParseJSON
-    , genericLiftParseJSON
-
-    , withObject
-    , withText
-    , withArray
-    , withScientific
-    , withBool
-    , withEmbeddedJSON
-
-    , pairs
-    , foldable
-    , (.:)
-    , (.:?)
-    , (.:!)
-    , (.!=)
-    , (.:?=)
-    , (.:!=)
-    , object
-    , parseField
-    , parseFieldMaybe
-    , parseFieldMaybe'
-    , parseFieldOmit
-    , parseFieldOmit'
-    , explicitParseField
-    , explicitParseFieldMaybe
-    , explicitParseFieldMaybe'
-    , explicitParseFieldOmit
-    , explicitParseFieldOmit'
-
-    , listEncoding
-    , listValue
-    , listParser
-
-    , Options
-
-    , fieldLabelModifier
-    , constructorTagModifier
-    , allNullaryToStringTag
-    , omitNothingFields
-    , allowOmittedFields
-    , sumEncoding
-    , unwrapUnaryRecords
-    , tagSingleConstructors
-    , rejectUnknownFields
-
-    , SumEncoding(..)
-    , camelTo
-    , camelTo2
-    , defaultOptions
-    , defaultTaggedObject
-
-    , JSONKeyOptions
-    , keyModifier
-    , defaultJSONKeyOptions
-
-    , AesonException (..)
-
-    , (<?>)
-    , JSONPath
-    , JSONPathElement(..)
-    , formatPath
-    , formatRelativePath
-    , formatError
-    ) where
-
-import Data.Aeson.Encoding (Encoding, unsafeToEncoding, fromEncoding, Series, pairs)
-import Data.Aeson.Types.Class
-import Data.Aeson.Types.Internal
-import Data.Foldable (toList)
-
 foldable :: (Foldable t, ToJSON a) => t a -> Encoding
 foldable = toEncoding . toList
-
-
-
-module Data.Aeson.Text
-    (
-      encodeToLazyText
-    , encodeToTextBuilder
-    ) where
-
-import Data.Aeson.Internal.Prelude
-
-import Data.Aeson.Types (Value(..), ToJSON(..))
-import Data.Aeson.Encoding (encodingToLazyByteString)
-import qualified Data.Aeson.KeyMap as KM
-import Data.Scientific (FPFormat(..), base10Exponent)
-import Data.Text.Lazy.Builder (Builder)
-import qualified Data.Text.Lazy.Builder as TB
-import Data.Text.Lazy.Builder.Scientific (formatScientificBuilder)
-import Numeric (showHex)
-import qualified Data.Aeson.Key as Key
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
-import qualified Data.Vector as V
 
 encodeToLazyText :: ToJSON a => a -> LT.Text
 encodeToLazyText = LT.decodeUtf8 . encodingToLazyByteString . toEncoding
@@ -2128,138 +1671,6 @@ fromScientific s = formatScientificBuilder format prec s
       | base10Exponent s < 0 = (Generic, Nothing)
       | otherwise            = (Fixed,   Just 0)
 
-
-Module:      Data.Aeson.TH
-Copyright:   (c) 2011-2016 Bryan O'Sullivan
-             (c) 2011 MailRank, Inc.
-License:     BSD3
-Stability:   experimental
-Portability: portable
-
-Functions to mechanically derive 'ToJSON' and 'FromJSON' instances. Note that
-you need to enable the @TemplateHaskell@ language extension in order to use this
-module.
-
-An example shows how instances are generated for arbitrary data types. First we
-define a data type:
-
-@
-data D a = Nullary
-         | Unary Int
-         | Product String Char a
-         | Record { testOne   :: Double
-                  , testTwo   :: Bool
-                  , testThree :: D a
-                  } deriving Eq
-@
-
-Next we derive the necessary instances. Note that we make use of the
-feature to change record field names. In this case we drop the first 4
-characters of every field name. We also modify constructor names by
-lower-casing them:
-
-@
-$('deriveJSON' 'defaultOptions'{'fieldLabelModifier' = 'drop' 4, 'constructorTagModifier' = map toLower} ''D)
-@
-
-Now we can use the newly created instances.
-
-@
-d :: D 'Int'
-d = Record { testOne = 3.14159
-           , testTwo = 'True'
-           , testThree = Product \"test\" \'A\' 123
-           }
-@
-
-@
-fromJSON (toJSON d) == Success d
-@
-
-This also works for data family instances, but instead of passing in the data
-family name (with double quotes), we pass in a data family instance
-constructor (with a single quote):
-
-@
-data family DF a
-data instance DF Int = DF1 Int
-                     | DF2 Int Int
-                     deriving Eq
-
-$('deriveJSON' 'defaultOptions' 'DF1)
-@
-
-Please note that you can derive instances for tuples using the following syntax:
-
-@
-$('deriveJSON' 'defaultOptions' ''(,,,))
-@
-
-If you derive `ToJSON` for a type that has no constructors, the splice will
-require enabling @EmptyCase@ to compile.
-
-module Data.Aeson.TH
-    (
-      Options(..)
-    , SumEncoding(..)
-    , defaultOptions
-    , defaultTaggedObject
-
-    , deriveJSON
-    , deriveJSON1
-    , deriveJSON2
-
-    , deriveToJSON
-    , deriveToJSON1
-    , deriveToJSON2
-    , deriveFromJSON
-    , deriveFromJSON1
-    , deriveFromJSON2
-
-    , mkToJSON
-    , mkLiftToJSON
-    , mkLiftToJSON2
-    , mkToEncoding
-    , mkLiftToEncoding
-    , mkLiftToEncoding2
-    , mkParseJSON
-    , mkLiftParseJSON
-    , mkLiftParseJSON2
-    ) where
-
-
-import Data.Aeson.Internal.Prelude
-
-import Data.Char (ord)
-import Data.Aeson (Object, (.:), FromJSON(..), FromJSON1(..), FromJSON2(..), ToJSON(..), ToJSON1(..), ToJSON2(..))
-import Data.Aeson.Types (Options(..), Parser, SumEncoding(..), Value(..), defaultOptions, defaultTaggedObject)
-import Data.Aeson.Types.Internal ((<?>), JSONPathElement(Key))
-import Data.Aeson.Types.ToJSON (fromPairs, pair)
-import Data.Aeson.Key (Key)
-import qualified Data.Aeson.Key as Key
-import qualified Data.Aeson.KeyMap as KM
-import Data.Foldable (foldr')
-import Data.List (genericLength, intercalate, union)
-import Data.List.NonEmpty ((<|), NonEmpty((:|)))
-import Data.Map (Map)
-import qualified Data.Monoid as Monoid
-import Data.Set (Set)
-import Language.Haskell.TH hiding (Arity)
-import Language.Haskell.TH.Datatype
-import Text.Printf (printf)
-import qualified Data.Aeson.Encoding.Internal as E
-import qualified Data.List.NonEmpty as NE (length, reverse)
-import qualified Data.Map as M (fromList, keys, lookup , singleton, size)
-import qualified Data.Set as Set (empty, insert, member)
-import qualified Data.Text as T (pack, unpack)
-import qualified Data.Vector as V (unsafeIndex, null, length, create, empty)
-import qualified Data.Vector.Mutable as VM (unsafeNew, unsafeWrite)
-import qualified Data.Text.Short as ST
-import Data.ByteString.Short (ShortByteString)
-import Data.Aeson.Internal.ByteString
-import Data.Aeson.Internal.TH
-
-
 deriveJSON :: Options
            -> Name
            -> Q [Dec]
@@ -2275,8 +1686,6 @@ deriveJSON2 :: Options
             -> Q [Dec]
 deriveJSON2 = deriveJSONBoth deriveToJSON2 deriveFromJSON2
 
-
-TODO: Don't constrain phantom type variables.
 
 data Foo a = Foo Int
 instance (ToJSON a) ⇒ ToJSON Foo where ...
@@ -2792,17 +2201,17 @@ consFromJSON jc tName opts instTys cons = do
       conKey <- newName "conKeyZ"
       conVal <- newName "conValZ"
       caseE ([e|KM.toList|] `appE` varE obj)
-            [ match (listP [tupP [varP conKey, varP conVal]])
-                    (normalB $ parseContents tvMap conKey (Right conVal) 'conNotFoundFailObjectSingleField [|Key.fromString|] [|Key.toString|])
+        [ match (listP [tupP [varP conKey, varP conVal]])
+                (normalB $ parseContents tvMap conKey (Right conVal) 'conNotFoundFailObjectSingleField [|Key.fromString|] [|Key.toString|])
+                []
+        , do other <- newName "other"
+              match (varP other)
+                    (normalB $ [|wrongPairCountFail|]
+                              `appE` litE (stringL $ show tName)
+                              `appE` ([|show . length|] `appE` varE other)
+                    )
                     []
-            , do other <- newName "other"
-                 match (varP other)
-                       (normalB $ [|wrongPairCountFail|]
-                                  `appE` litE (stringL $ show tName)
-                                  `appE` ([|show . length|] `appE` varE other)
-                       )
-                       []
-            ]
+        ]
 
     parseContents tvMap conKey contents errorFun pack unpack =
         caseE (varE conKey)
@@ -3338,82 +2747,6 @@ deriveConstraint jc t
     jcConstraint :: Arity -> Name
     jcConstraint = jsonClassName . JSONClass (direction jc)
 
-Note [Kind signatures in derived instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It is possible to put explicit kind signatures into the derived instances, e.g.,
-
-  instance C a => C (Data (f :: * -> *)) where ...
-
-But it is preferable to avoid this if possible. If we come up with an incorrect
-kind signature (which is entirely possible, since Template Haskell doesn't always
-have the best track record with reifying kind signatures), then GHC will flat-out
-reject the instance, which is quite unfortunate.
-
-Plain old datatypes have the advantage that you can avoid using any kind signatures
-at all in their instances. This is because a datatype declaration uses all type
-variables, so the types that we use in a derived instance uniquely determine their
-kinds. As long as we plug in the right types, the kind inferencer can do the rest
-of the work. For this reason, we use unSigT to remove all kind signatures before
-splicing in the instance context and head.
-
-Data family instances are trickier, since a data family can have two instances that
-are distinguished by kind alone, e.g.,
-
-  data family Fam (a :: k)
-  data instance Fam (a :: * -> *)
-  data instance Fam (a :: *)
-
-If we dropped the kind signatures for C (Fam a), then GHC will have no way of
-knowing which instance we are talking about. To avoid this scenario, we always
-include explicit kind signatures in data family instances. There is a chance that
-the inferred kind signatures will be incorrect, but if so, we can always fall back
-on the mk- functions.
-
-Note [Type inference in derived instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Type inference is can be tricky to get right, and we want to avoid recreating the
-entirety of GHC's type inferencer in Template Haskell. For this reason, we will
-probably never come up with derived instance contexts that are as accurate as
-GHC's. But that doesn't mean we can't do anything! There are a couple of simple
-things we can do to make instance contexts that work for 80% of use cases:
-
-1. If one of the last type parameters is polykinded, then its kind will be
-   specialized to * in the derived instance. We note what kind variable the type
-   parameter had and substitute it with * in the other types as well. For example,
-   imagine you had
-
-     data Data (a :: k) (b :: k)
-
-   Then you'd want to derived instance to be:
-
-     instance C (Data (a :: *))
-
-   Not:
-
-     instance C (Data (a :: k))
-
-2. We naïvely come up with instance constraints using the following criteria:
-
-   (i)   If there's a type parameter n of kind *, generate a ToJSON n/FromJSON n
-         constraint.
-   (ii)  If there's a type parameter n of kind k1 -> k2 (where k1/k2 are * or kind
-         variables), then generate a ToJSON1 n/FromJSON1 n constraint, and if
-         k1/k2 are kind variables, then substitute k1/k2 with * elsewhere in the
-         types. We must consider the case where they are kind variables because
-         you might have a scenario like this:
-
-           newtype Compose (f :: k2 -> *) (g :: k1 -> k2) (a :: k1)
-             = Compose (f (g a))
-
-         Which would have a derived ToJSON1 instance of:
-
-           instance (ToJSON1 f, ToJSON1 g) => ToJSON1 (Compose f g) where ...
-   (iii) If there's a type parameter n of kind k1 -> k2 -> k3 (where k1/k2/k3 are
-         * or kind variables), then generate a ToJSON2 n/FromJSON2 n constraint
-         and perform kind substitution as in the other cases.
-
 checkExistentialContext :: JSONClass -> TyVarMap -> Cxt -> Name
                         -> Q a -> Q a
 checkExistentialContext jc tvMap ctxt conName q =
@@ -3422,31 +2755,6 @@ checkExistentialContext jc tvMap ctxt conName q =
        && not (allowExQuant jc)
      then existentialContextError conName
      else q
-
-Note [Matching functions with GADT type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When deriving ToJSON2, there is a tricky corner case to consider:
-
-  data Both a b where
-    BothCon :: x -> x -> Both x x
-
-Which encoding functions should be applied to which arguments of BothCon?
-We have a choice, since both the function of type (a -> Value) and of type
-(b -> Value) can be applied to either argument. In such a scenario, the
-second encoding function takes precedence over the first encoding function, so the
-derived ToJSON2 instance would be something like:
-
-  instance ToJSON2 Both where
-    liftToJSON2 tj1 tj2 p (BothCon x1 x2) = Array $ create $ do
-      mv <- unsafeNew 2
-      unsafeWrite mv 0 (tj1 x1)
-      unsafeWrite mv 1 (tj2 x2)
-      return mv
-
-This is not an arbitrary choice, as this definition ensures that
-liftToJSON2 toJSON = liftToJSON for a derived ToJSON1 instance for
-Both.
 
 type TyVarMap = Map Name (Name, Name, Name)
 
@@ -3766,153 +3074,6 @@ starKindStatusToName _             = Nothing
 
 catKindVarNames :: [StarKindStatus] -> [Name]
 catKindVarNames = mapMaybe starKindStatusToName
-
-
-
-module Data.Vector (
-  Vector, MVector,
-
-
-  length, null,
-
-  (!), (!?), head, last,
-  unsafeIndex, unsafeHead, unsafeLast,
-
-  indexM, headM, lastM,
-  unsafeIndexM, unsafeHeadM, unsafeLastM,
-
-  slice, init, tail, take, drop, splitAt, uncons, unsnoc,
-  unsafeSlice, unsafeInit, unsafeTail, unsafeTake, unsafeDrop,
-
-
-  empty, singleton, replicate, generate, iterateN,
-
-  replicateM, generateM, iterateNM, create, createT,
-
-  unfoldr, unfoldrN, unfoldrExactN,
-  unfoldrM, unfoldrNM, unfoldrExactNM,
-  constructN, constructrN,
-
-  enumFromN, enumFromStepN, enumFromTo, enumFromThenTo,
-
-  cons, snoc, (++), concat,
-
-  force,
-
-
-  (//), update, update_,
-  unsafeUpd, unsafeUpdate, unsafeUpdate_,
-
-  accum, accumulate, accumulate_,
-  unsafeAccum, unsafeAccumulate, unsafeAccumulate_,
-
-  reverse, backpermute, unsafeBackpermute,
-
-  modify,
-
-
-  indexed,
-
-  map, imap, concatMap,
-
-  mapM, imapM, mapM_, imapM_, forM, forM_,
-  iforM, iforM_,
-
-  zipWith, zipWith3, zipWith4, zipWith5, zipWith6,
-  izipWith, izipWith3, izipWith4, izipWith5, izipWith6,
-  zip, zip3, zip4, zip5, zip6,
-
-  zipWithM, izipWithM, zipWithM_, izipWithM_,
-
-  unzip, unzip3, unzip4, unzip5, unzip6,
-
-
-  filter, ifilter, filterM, uniq,
-  mapMaybe, imapMaybe,
-  mapMaybeM, imapMaybeM,
-  catMaybes,
-  takeWhile, dropWhile,
-
-  partition, unstablePartition, partitionWith, span, break, spanR, breakR, groupBy, group,
-
-  elem, notElem, find, findIndex, findIndexR, findIndices, elemIndex, elemIndices,
-
-  foldl, foldl1, foldl', foldl1', foldr, foldr1, foldr', foldr1',
-  ifoldl, ifoldl', ifoldr, ifoldr',
-  foldMap, foldMap',
-
-  all, any, and, or,
-  sum, product,
-  maximum, maximumBy, maximumOn,
-  minimum, minimumBy, minimumOn,
-  minIndex, minIndexBy, maxIndex, maxIndexBy,
-
-  foldM, ifoldM, foldM', ifoldM',
-  fold1M, fold1M',foldM_, ifoldM_,
-  foldM'_, ifoldM'_, fold1M_, fold1M'_,
-
-  sequence, sequence_,
-
-  prescanl, prescanl',
-  postscanl, postscanl',
-  scanl, scanl', scanl1, scanl1',
-  iscanl, iscanl',
-  prescanr, prescanr',
-  postscanr, postscanr',
-  scanr, scanr', scanr1, scanr1',
-  iscanr, iscanr',
-
-  eqBy, cmpBy,
-
-
-  toList, Data.Vector.fromList, Data.Vector.fromListN,
-
-  toArray, fromArray, toArraySlice, unsafeFromArraySlice,
-
-  G.convert,
-
-  freeze, thaw, copy, unsafeFreeze, unsafeThaw, unsafeCopy
-) where
-
-import Data.Vector.Mutable  ( MVector(..) )
-import Data.Primitive.Array
-import qualified Data.Vector.Fusion.Bundle as Bundle
-import qualified Data.Vector.Generic as G
-
-import Control.DeepSeq ( NFData(rnf)
-#if MIN_VERSION_deepseq(1,4,3)
-                       , NFData1(liftRnf)
-#endif
-                       )
-
-import Control.Monad ( MonadPlus(..), liftM, ap )
-#if !MIN_VERSION_base(4,13,0)
-import Control.Monad (fail)
-#endif
-import Control.Monad.ST ( ST, runST )
-import Control.Monad.Primitive
-import qualified Control.Monad.Fail as Fail
-import Control.Monad.Fix ( MonadFix (mfix) )
-import Control.Monad.Zip
-import Data.Function ( fix )
-
-import Prelude
-  ( Eq, Ord, Num, Enum, Monoid, Functor, Monad, Show, Bool, Ordering(..), Int, Maybe, Either
-  , compare, mempty, mappend, mconcat, return, showsPrec, fmap, otherwise, id, flip, const
-  , (>>=), (+), (-), (<), (<=), (>), (>=), (==), (/=), (&&), (.), ($) )
-
-import Data.Functor.Classes (Eq1 (..), Ord1 (..), Read1 (..), Show1 (..))
-import Data.Typeable  ( Typeable )
-import Data.Data      ( Data(..) )
-import Text.Read      ( Read(..), readListPrecDefault )
-import Data.Semigroup ( Semigroup(..) )
-
-import qualified Control.Applicative as Applicative
-import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
-
-import qualified GHC.Exts as Exts (IsList(..))
-
 
 data Vector a = Vector {-# UNPACK #-} !Int
         deriving ( Typeable )
@@ -4817,148 +3978,6 @@ unsafeCopy = G.unsafeCopy
 
 copy :: PrimMonad m => MVector (PrimState m) a -> Vector a -> m ()
 copy = G.copy
-
-
-
-
-module Data.HashMap.Internal
-    (
-      HashMap(..)
-    , Leaf(..)
-
-    , empty
-    , singleton
-
-    , null
-    , size
-    , member
-    , lookup
-    , (!?)
-    , findWithDefault
-    , lookupDefault
-    , (!)
-    , insert
-    , insertWith
-    , unsafeInsert
-    , delete
-    , adjust
-    , update
-    , alter
-    , alterF
-    , isSubmapOf
-    , isSubmapOfBy
-
-    , union
-    , unionWith
-    , unionWithKey
-    , unions
-
-    , compose
-
-    , map
-    , mapWithKey
-    , traverseWithKey
-    , mapKeys
-
-    , difference
-    , differenceWith
-    , intersection
-    , intersectionWith
-    , intersectionWithKey
-    , intersectionWithKey#
-
-    , foldr'
-    , foldl'
-    , foldrWithKey'
-    , foldlWithKey'
-    , foldr
-    , foldl
-    , foldrWithKey
-    , foldlWithKey
-    , foldMapWithKey
-
-    , mapMaybe
-    , mapMaybeWithKey
-    , filter
-    , filterWithKey
-
-    , keys
-    , elems
-
-    , toList
-    , fromList
-    , fromListWith
-    , fromListWithKey
-
-    , Hash
-    , Bitmap
-    , Shift
-    , bitmapIndexedOrFull
-    , collision
-    , hash
-    , mask
-    , index
-    , bitsPerSubkey
-    , maxChildren
-    , isLeafOrCollision
-    , fullBitmap
-    , subkeyMask
-    , nextShift
-    , sparseIndex
-    , two
-    , unionArrayBy
-    , update32
-    , update32M
-    , update32With'
-    , updateOrConcatWithKey
-    , filterMapAux
-    , equalKeys
-    , equalKeys1
-    , lookupRecordCollision
-    , LookupRes(..)
-    , lookupResToMaybe
-    , insert'
-    , delete'
-    , lookup'
-    , insertNewKey
-    , insertKeyExists
-    , deleteKeyExists
-    , insertModifying
-    , ptrEq
-    , adjust#
-    ) where
-
-import Control.Applicative        (Const (..))
-import Control.DeepSeq            (NFData (..), NFData1 (..), NFData2 (..))
-import Control.Monad.ST           (ST, runST)
-import Data.Bifoldable            (Bifoldable (..))
-import Data.Bits                  (complement, countTrailingZeros, popCount,
-                                   shiftL, unsafeShiftL, unsafeShiftR, (.&.),
-                                   (.|.))
-import Data.Coerce                (coerce)
-import Data.Data                  (Constr, Data (..), DataType)
-import Data.Functor.Classes       (Eq1 (..), Eq2 (..), Ord1 (..), Ord2 (..),
-                                   Read1 (..), Show1 (..), Show2 (..))
-import Data.Functor.Identity      (Identity (..))
-import Data.Hashable              (Hashable)
-import Data.Hashable.Lifted       (Hashable1, Hashable2)
-import Data.HashMap.Internal.List (isPermutationBy, unorderedCompare)
-import Data.Semigroup             (Semigroup (..), stimesIdempotentMonoid)
-import GHC.Exts                   (Int (..), Int#, TYPE, (==#))
-import GHC.Stack                  (HasCallStack)
-import Prelude                    hiding (Foldable(..), filter, lookup, map,
-                                   pred)
-import Text.Read                  hiding (step)
-
-import qualified Data.Data                   as Data
-import qualified Data.Foldable               as Foldable
-import qualified Data.Functor.Classes        as FC
-import qualified Data.Hashable               as H
-import qualified Data.Hashable.Lifted        as H
-import qualified Data.HashMap.Internal.Array as A
-import qualified Data.List                   as List
-import qualified GHC.Exts                    as Exts
-import qualified Language.Haskell.TH.Syntax  as TH
 
 hash :: H.Hashable a => a -> Hash
 hash = fromIntegral . H.hash
@@ -6469,8 +5488,6 @@ clone :: A.Array e -> ST s (A.MArray s e)
 clone ary =
     A.thaw ary 0 (2^bitsPerSubkey)
 
-
-
 bitsPerSubkey :: Int
 bitsPerSubkey = 5
 
@@ -6512,47 +5529,18 @@ instance (Eq k, Hashable k) => Exts.IsList (HashMap k v) where
 #if __GLASGOW_HASKELL__ >= 710 && __GLASGOW_HASKELL__ < 802
 #endif
 
-module Control.Monad.Trans.Reader (
-    Reader,
-    reader,
-    runReader,
-    mapReader,
-    withReader,
-    ReaderT(..),
-    mapReaderT,
-    withReaderT,
-    ask,
-    local,
-    asks,
-    liftCallCC,
-    liftCatch,
-    ) where
-
-import Control.Monad.IO.Class
-import Control.Monad.Signatures
-import Control.Monad.Trans.Class
 #if MIN_VERSION_base(4,12,0)
-import Data.Functor.Contravariant
 #endif
-import Data.Functor.Identity
 
-import Control.Applicative
-import Control.Monad
 #if MIN_VERSION_base(4,9,0)
-import qualified Control.Monad.Fail as Fail
 #endif
-import Control.Monad.Fix
 #if !(MIN_VERSION_base(4,6,0))
-import Control.Monad.Instances ()  -- deprecated from base-4.6
 #endif
 #if MIN_VERSION_base(4,4,0)
-import Control.Monad.Zip (MonadZip(mzipWith))
 #endif
 #if (MIN_VERSION_base(4,2,0)) && !(MIN_VERSION_base(4,8,0))
-import Data.Functor ((<$))
 #endif
 #if __GLASGOW_HASKELL__ >= 704
-import GHC.Generics
 #endif
 
 type Reader r = ReaderT r Identity
@@ -6688,7 +5676,6 @@ liftCatch f m h =
 #if __GLASGOW_HASKELL__ >= 710 && __GLASGOW_HASKELL__ < 802
 #endif
 
-module Control.Monad.Trans.Maybe (
     MaybeT(..),
     mapMaybeT,
     hoistMaybe,
@@ -6698,33 +5685,17 @@ module Control.Monad.Trans.Maybe (
     liftCatch,
     liftListen,
     liftPass,
-  ) where
 
-import Control.Monad.IO.Class
-import Control.Monad.Signatures
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except (ExceptT(..))
-import Data.Functor.Classes
 #if MIN_VERSION_base(4,12,0)
-import Data.Functor.Contravariant
 #endif
 
-import Control.Applicative
-import Control.Monad (MonadPlus(mzero, mplus), liftM)
 #if MIN_VERSION_base(4,9,0)
-import qualified Control.Monad.Fail as Fail
 #endif
-import Control.Monad.Fix (MonadFix(mfix))
 #if MIN_VERSION_base(4,4,0)
-import Control.Monad.Zip (MonadZip(mzipWith))
 #endif
-import Data.Maybe (fromMaybe)
 #if !(MIN_VERSION_base(4,8,0)) || defined(__MHS__)
-import Data.Foldable (Foldable(foldMap))
-import Data.Traversable (Traversable(traverse))
 #endif
 #if __GLASGOW_HASKELL__ >= 704
-import GHC.Generics
 #endif
 
 newtype MaybeT m a = MaybeT { runMaybeT :: m (Maybe a) }
@@ -6868,7 +5839,6 @@ liftPass pass = mapMaybeT $ \ m -> pass $ do
 
 
 
-module Data.Time.Format.Parse (
     parseTimeM,
     parseTimeMultipleM,
     parseTimeOrError,
@@ -6876,25 +5846,7 @@ module Data.Time.Format.Parse (
     readPTime,
     ParseTime (),
 
-    module Data.Time.Format.Locale,
-) where
 
-import Control.Monad.Fail
-import Data.Char
-import Data.Proxy
-import Data.Time.Calendar.Days
-import Data.Time.Clock.Internal.UTCTime
-import Data.Time.Clock.Internal.UniversalTime
-import Data.Time.Format.Locale
-import Data.Time.Format.Parse.Class
-import Data.Time.Format.Parse.Instances ()
-import Data.Time.LocalTime.Internal.LocalTime
-import Data.Time.LocalTime.Internal.TimeOfDay
-import Data.Time.LocalTime.Internal.TimeZone
-import Data.Time.LocalTime.Internal.ZonedTime
-import Data.Traversable
-import Text.ParserCombinators.ReadP hiding (char, string)
-import Prelude hiding (fail)
 
 parseTimeM ::
     (MonadFail m, ParseTime t) =>
@@ -7033,7 +5985,6 @@ instance Read UniversalTime where
     readsPrec n s = [(localTimeToUT1 0 t, r) | (t, r) <- readsPrec n s]
 
 
-module Data.Time.LocalTime.Internal.TimeOfDay (
     TimeOfDay (..),
     midnight,
     midday,
@@ -7048,16 +5999,7 @@ module Data.Time.LocalTime.Internal.TimeOfDay (
     sinceMidnight,
     dayFractionToTimeOfDay,
     timeOfDayToDayFraction,
-) where
 
-import Control.DeepSeq
-import Data.Data
-import Data.Fixed
-import Data.Time.Calendar.Private
-import Data.Time.Clock.Internal.DiffTime
-import Data.Time.Clock.Internal.NominalDiffTime
-import Data.Time.LocalTime.Internal.TimeZone
-import GHC.Generics
 
 data TimeOfDay = TimeOfDay
     { todHour :: Int
@@ -8045,103 +6987,6 @@ cSsizeToInt = P.fromIntegral
 word8ToInt8 :: Word8 -> Int8
 word8ToInt8 = P.fromIntegral
 
-
-
-
-module Data.Text.Encoding
-    (
-
-      decodeLatin1
-    , decodeASCIIPrefix
-    , decodeUtf8Lenient
-    , decodeUtf8'
-    , decodeASCII'
-
-    , decodeUtf8With
-    , decodeUtf16LEWith
-    , decodeUtf16BEWith
-    , decodeUtf32LEWith
-    , decodeUtf32BEWith
-
-    , streamDecodeUtf8With
-    , Decoding(..)
-
-    , decodeUtf8Chunk
-    , decodeUtf8More
-    , Utf8State
-    , startUtf8State
-    , StrictBuilder
-    , StrictTextBuilder
-    , strictBuilderToText
-    , textToStrictBuilder
-
-    , decodeASCII
-    , decodeUtf8
-    , decodeUtf16LE
-    , decodeUtf16BE
-    , decodeUtf32LE
-    , decodeUtf32BE
-
-    , streamDecodeUtf8
-
-    , encodeUtf8
-    , encodeUtf16LE
-    , encodeUtf16BE
-    , encodeUtf32LE
-    , encodeUtf32BE
-
-    , encodeUtf8Builder
-    , encodeUtf8BuilderEscaped
-
-    , validateUtf8Chunk
-    , validateUtf8More
-    ) where
-
-import Control.Exception (evaluate, try)
-import Data.Word (Word8)
-import GHC.Exts (byteArrayContents#, unsafeCoerce#)
-import GHC.ForeignPtr (ForeignPtr(..), ForeignPtrContents(PlainPtr))
-import Data.ByteString (ByteString)
-#if defined(PURE_HASKELL)
-import Control.Monad.ST.Unsafe (unsafeSTToIO)
-import Data.ByteString.Char8 (unpack)
-import Data.Text.Internal (pack)
-import Foreign.Ptr (minusPtr, plusPtr)
-import Foreign.Storable (poke)
-#else
-import Control.Monad.ST (runST)
-import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
-import Data.Bits (shiftR, (.&.))
-import Data.Text.Internal.ByteStringCompat (withBS)
-import Data.Text.Internal.Unsafe (unsafeWithForeignPtr)
-import Foreign.C.Types (CSize(..))
-import Foreign.Ptr (Ptr, minusPtr, plusPtr)
-import Foreign.Storable (poke, peekByteOff)
-#endif
-import Data.Text.Encoding.Error (OnDecodeError, UnicodeException, strictDecode, lenientDecode)
-import Data.Text.Internal (Text(..), empty)
-import Data.Text.Internal.Encoding
-import Data.Text.Internal.IsAscii (asciiPrefixLength)
-import Data.Text.Unsafe (unsafeDupablePerformIO)
-import Data.Text.Show ()
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Internal as B
-import qualified Data.ByteString.Builder as B
-import qualified Data.ByteString.Builder.Internal as B hiding (empty, append)
-import qualified Data.ByteString.Builder.Prim as BP
-import qualified Data.ByteString.Builder.Prim.Internal as BP
-import qualified Data.ByteString.Short.Internal as SBS
-import qualified Data.Text.Array as A
-import qualified Data.Text.Internal.Encoding.Fusion as E
-import qualified Data.Text.Internal.Fusion as F
-#if defined(ASSERTS)
-import GHC.Stack (HasCallStack)
-#endif
-
-
-
-
-
 decodeASCIIPrefix :: ByteString -> (Text, ByteString)
 decodeASCIIPrefix bs = if B.null bs
   then (empty, B.empty)
@@ -8356,42 +7201,6 @@ encodeUtf32LE txt = E.unstream (E.restreamUtf32LE (F.stream txt))
 encodeUtf32BE :: Text -> ByteString
 encodeUtf32BE txt = E.unstream (E.restreamUtf32BE (F.stream txt))
 
-
-
-module Data.Text.IO
-    (
-      readFile
-    , writeFile
-    , appendFile
-    , hGetContents
-    , hGetChunk
-    , hGetLine
-    , hPutStr
-    , hPutStrLn
-    , interact
-    , getContents
-    , getLine
-    , putStr
-    , putStrLn
-    ) where
-
-import Data.Text (Text)
-import Prelude hiding (appendFile, getContents, getLine, interact,
-                       putStr, putStrLn, readFile, writeFile)
-import System.IO (Handle, IOMode(..), openFile, stdin, stdout,
-                  withFile)
-import qualified Control.Exception as E
-import Control.Monad (liftM2, when)
-import Data.IORef (readIORef)
-import qualified Data.Text as T
-import Data.Text.Internal.IO (hGetLineWith, readChunk, hPutStr, hPutStrLn)
-import GHC.IO.Buffer (CharBuffer, isEmptyBuffer)
-import GHC.IO.Exception (IOException(ioe_type), IOErrorType(InappropriateType))
-import GHC.IO.Handle.Internals (augmentIOError, hClose_help, wantReadableHandle)
-import GHC.IO.Handle.Types (BufferMode(..), Handle__(..), HandleType(..))
-import System.IO (hGetBuffering, hFileSize, hSetBuffering, hTell)
-import System.IO.Error (isEOFError)
-
 readFile :: FilePath -> IO Text
 readFile name = openFile name ReadMode >>= hGetContents
 
@@ -8468,199 +7277,6 @@ putStr = hPutStr stdout
 
 putStrLn :: Text -> IO ()
 putStrLn = hPutStrLn stdout
-
-
-
-module Data.Text.Lazy
-    (
-
-
-      Text
-    , LazyText
-
-    , pack
-    , unpack
-    , singleton
-    , empty
-    , fromChunks
-    , toChunks
-    , toStrict
-    , fromStrict
-    , foldrChunks
-    , foldlChunks
-
-    , pattern Empty
-    , pattern (:<)
-    , pattern (:>)
-
-    , cons
-    , snoc
-    , append
-    , uncons
-    , unsnoc
-    , head
-    , last
-    , tail
-    , init
-    , null
-    , length
-    , compareLength
-
-    , map
-    , intercalate
-    , intersperse
-    , transpose
-    , reverse
-    , replace
-
-    , toCaseFold
-    , toLower
-    , toUpper
-    , toTitle
-
-    , justifyLeft
-    , justifyRight
-    , center
-
-    , foldl
-    , foldl'
-    , foldl1
-    , foldl1'
-    , foldr
-    , foldr1
-    , foldlM'
-
-    , concat
-    , concatMap
-    , any
-    , all
-    , maximum
-    , minimum
-    , isAscii
-
-
-    , scanl
-    , scanl1
-    , scanr
-    , scanr1
-
-    , mapAccumL
-    , mapAccumR
-
-    , repeat
-    , replicate
-    , cycle
-    , iterate
-    , unfoldr
-    , unfoldrN
-
-
-    , take
-    , takeEnd
-    , drop
-    , dropEnd
-    , takeWhile
-    , takeWhileEnd
-    , dropWhile
-    , dropWhileEnd
-    , dropAround
-    , strip
-    , stripStart
-    , stripEnd
-    , splitAt
-    , span
-    , spanM
-    , spanEndM
-    , breakOn
-    , breakOnEnd
-    , break
-    , group
-    , groupBy
-    , inits
-    , initsNE
-    , tails
-    , tailsNE
-
-    , splitOn
-    , split
-    , chunksOf
-
-    , lines
-    , words
-    , unlines
-    , unwords
-
-    , isPrefixOf
-    , isSuffixOf
-    , isInfixOf
-
-    , stripPrefix
-    , stripSuffix
-    , commonPrefixes
-
-    , filter
-    , find
-    , elem
-    , breakOnAll
-    , partition
-
-
-    , index
-    , count
-
-    , zip
-    , zipWith
-
-    , show
-
-    ) where
-
-import Prelude (Char, Bool(..), Maybe(..), String,
-                Eq, (==), Ord(..), Ordering(..), Read(..), Show(showsPrec),
-                Monad(..), pure, (<$>),
-                (&&), (+), (-), (.), ($), (++),
-                error, flip, fmap, fromIntegral, not, otherwise, quot)
-import qualified Prelude as P
-import Control.Arrow (first)
-import Control.DeepSeq (NFData(..))
-import Data.Bits (finiteBitSize)
-import Data.Int (Int64)
-import qualified Data.List as L hiding (head, tail)
-import Data.Char (isSpace)
-import Data.Data (Data(gfoldl, toConstr, gunfold, dataTypeOf), constrIndex,
-                  Constr, mkConstr, DataType, mkDataType, Fixity(Prefix))
-import Data.Binary (Binary(get, put))
-import Data.Binary.Put (putBuilder)
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import Data.Monoid (Monoid(..))
-import Data.Semigroup (Semigroup(..))
-import Data.String (IsString(..))
-import qualified Data.Text as T
-import qualified Data.Text.Array as A
-import qualified Data.Text.Internal as T
-import qualified Data.Text.Internal.Fusion.Common as S
-import qualified Data.Text.Unsafe as T
-import qualified Data.Text.Internal.Lazy.Fusion as S
-import Data.Text.Internal.Fusion.Types (PairS(..))
-import Data.Text.Internal.Lazy.Fusion (stream, unstream)
-import Data.Text.Internal.Lazy (Text(..), chunk, empty, foldlChunks,
-                                foldrChunks, smallChunkSize, defaultChunkSize, equal, LazyText)
-import Data.Text.Internal (firstf, safe, text)
-import Data.Text.Internal.Reverse (reverseNonEmpty)
-import Data.Text.Internal.Transformation (mapNonEmpty, toCaseFoldNonEmpty, toLowerNonEmpty, toUpperNonEmpty, filter_)
-import Data.Text.Lazy.Encoding (decodeUtf8', encodeUtf8Builder)
-import Data.Text.Internal.Lazy.Search (indices)
-import qualified GHC.CString as GHC
-import qualified GHC.Exts as Exts
-import GHC.Prim (Addr#)
-import GHC.Stack (HasCallStack)
-import qualified Language.Haskell.TH.Lib as TH
-import qualified Language.Haskell.TH.Syntax as TH
-import Text.Printf (PrintfArg, formatArg, formatString)
-
-
-
 
 instance Eq Text where
     (==) = equal
@@ -9453,318 +8069,6 @@ intToInt64 = fromIntegral
 int64ToInt :: Int64 -> Exts.Int
 int64ToInt = fromIntegral
 
-module Network.Socket (
-    withSocketsDo,
-
-    getAddrInfo,
-
-    HostName,
-    ServiceName,
-    AddrInfo (..),
-    defaultHints,
-
-    AddrInfoFlag (..),
-    addrInfoFlagImplemented,
-
-    connect,
-    bind,
-    listen,
-    accept,
-
-    close,
-    close',
-    gracefulClose,
-    shutdown,
-    ShutdownCmd (..),
-
-    SocketOption (
-        SockOpt,
-        UnsupportedSocketOption,
-        Debug,
-        ReuseAddr,
-        SoDomain,
-        Type,
-        SoProtocol,
-        SoError,
-        DontRoute,
-        Broadcast,
-        SendBuffer,
-        RecvBuffer,
-        KeepAlive,
-        OOBInline,
-        TimeToLive,
-        MaxSegment,
-        NoDelay,
-        Cork,
-        Linger,
-        ReusePort,
-        RecvLowWater,
-        SendLowWater,
-        RecvTimeOut,
-        SendTimeOut,
-        UseLoopBack,
-        UserTimeout,
-        IPv6Only,
-        RecvIPv4TTL,
-        RecvIPv4TOS,
-        RecvIPv4PktInfo,
-        RecvIPv6HopLimit,
-        RecvIPv6TClass,
-        RecvIPv6PktInfo
-    ),
-    isSupportedSocketOption,
-    whenSupported,
-    getSocketOption,
-    setSocketOption,
-    StructLinger (..),
-    SocketTimeout (..),
-    getSockOpt,
-    setSockOpt,
-    SockOptValue (..),
-    setSockOptValue,
-
-    Socket,
-    socket,
-    openSocket,
-    withFdSocket,
-    unsafeFdSocket,
-    touchSocket,
-    socketToFd,
-    fdSocket,
-    mkSocket,
-    socketToHandle,
-
-    SocketType (
-        GeneralSocketType,
-        UnsupportedSocketType,
-        NoSocketType,
-        Stream,
-        Datagram,
-        Raw,
-        RDM,
-        SeqPacket
-    ),
-    isSupportedSocketType,
-    getSocketType,
-
-    Family (
-        GeneralFamily,
-        UnsupportedFamily,
-        AF_UNSPEC,
-        AF_UNIX,
-        AF_INET,
-        AF_INET6,
-        AF_IMPLINK,
-        AF_PUP,
-        AF_CHAOS,
-        AF_NS,
-        AF_NBS,
-        AF_ECMA,
-        AF_DATAKIT,
-        AF_CCITT,
-        AF_SNA,
-        AF_DECnet,
-        AF_DLI,
-        AF_LAT,
-        AF_HYLINK,
-        AF_APPLETALK,
-        AF_ROUTE,
-        AF_NETBIOS,
-        AF_NIT,
-        AF_802,
-        AF_ISO,
-        AF_OSI,
-        AF_NETMAN,
-        AF_X25,
-        AF_AX25,
-        AF_OSINET,
-        AF_GOSSIP,
-        AF_IPX,
-        Pseudo_AF_XTP,
-        AF_CTF,
-        AF_WAN,
-        AF_SDL,
-        AF_NETWARE,
-        AF_NDD,
-        AF_INTF,
-        AF_COIP,
-        AF_CNT,
-        Pseudo_AF_RTIP,
-        Pseudo_AF_PIP,
-        AF_SIP,
-        AF_ISDN,
-        Pseudo_AF_KEY,
-        AF_NATM,
-        AF_ARP,
-        Pseudo_AF_HDRCMPLT,
-        AF_ENCAP,
-        AF_LINK,
-        AF_RAW,
-        AF_RIF,
-        AF_NETROM,
-        AF_BRIDGE,
-        AF_ATMPVC,
-        AF_ROSE,
-        AF_NETBEUI,
-        AF_SECURITY,
-        AF_PACKET,
-        AF_ASH,
-        AF_ECONET,
-        AF_ATMSVC,
-        AF_IRDA,
-        AF_PPPOX,
-        AF_WANPIPE,
-        AF_BLUETOOTH,
-        AF_CAN
-    ),
-    isSupportedFamily,
-    packFamily,
-    unpackFamily,
-
-    ProtocolNumber,
-    defaultProtocol,
-
-    SockAddr (..),
-    isSupportedSockAddr,
-    getPeerName,
-    getSocketName,
-
-    HostAddress,
-    hostAddressToTuple,
-    tupleToHostAddress,
-
-    HostAddress6,
-    hostAddress6ToTuple,
-    tupleToHostAddress6,
-
-    FlowInfo,
-
-    ScopeID,
-    ifNameToIndex,
-    ifIndexToName,
-
-    PortNumber,
-    defaultPort,
-    socketPortSafe,
-    socketPort,
-
-    isUnixDomainSocketAvailable,
-    socketPair,
-    sendFd,
-    recvFd,
-    getPeerCredential,
-
-    getNameInfo,
-    NameInfoFlag (..),
-
-
-    setCloseOnExecIfNeeded,
-    getCloseOnExec,
-    setNonBlockIfNeeded,
-    getNonBlock,
-
-    sendBuf,
-    recvBuf,
-    sendBufTo,
-    recvBufFrom,
-
-    sendBufMsg,
-    recvBufMsg,
-    MsgFlag (
-        MSG_OOB,
-        MSG_DONTROUTE,
-        MSG_PEEK,
-        MSG_EOR,
-        MSG_TRUNC,
-        MSG_CTRUNC,
-        MSG_WAITALL
-    ),
-
-    Cmsg (..),
-    CmsgId (
-        CmsgId,
-        CmsgIdIPv4TTL,
-        CmsgIdIPv6HopLimit,
-        CmsgIdIPv4TOS,
-        CmsgIdIPv6TClass,
-        CmsgIdIPv4PktInfo,
-        CmsgIdIPv6PktInfo,
-        CmsgIdFds,
-        UnsupportedCmsgId
-    ),
-
-    lookupCmsg,
-    filterCmsg,
-
-    ControlMessage (..),
-    IPv4TTL (..),
-    IPv6HopLimit (..),
-    IPv4TOS (..),
-    IPv6TClass (..),
-    IPv4PktInfo (..),
-    IPv6PktInfo (..),
-
-    maxListenQueue,
-
-    waitReadSocketSTM,
-    waitAndCancelReadSocketSTM,
-    waitWriteSocketSTM,
-    waitAndCancelWriteSocketSTM,
-) where
-
-import Network.Socket.Buffer hiding (
-    recvBufFrom,
-    recvBufMsg,
-    sendBufMsg,
-    sendBufTo,
- )
-import Network.Socket.Cbits
-import Network.Socket.Fcntl
-import Network.Socket.Flag
-import Network.Socket.Handle
-import Network.Socket.If
-import Network.Socket.Info
-import Network.Socket.Internal
-import Network.Socket.Name hiding (getPeerName, getSocketName)
-import Network.Socket.Options
-import Network.Socket.STM
-import Network.Socket.Shutdown
-import Network.Socket.SockAddr
-import Network.Socket.Syscall hiding (accept, bind, connect)
-import Network.Socket.Types
-import Network.Socket.Unix
-#if !defined(mingw32_HOST_OS)
-import Network.Socket.Posix.Cmsg
-#else
-import Network.Socket.Win32.Cmsg
-#endif
-
-module Network.Socket.ByteString (
-    send,
-    sendAll,
-    sendTo,
-    sendAllTo,
-
-    sendMany,
-    sendManyTo,
-    sendManyWithFds,
-
-    recv,
-    recvFrom,
-
-    sendMsg,
-    recvMsg,
-) where
-
-import Data.ByteString (ByteString)
-
-import Network.Socket.ByteString.IO hiding (recvFrom, sendAllTo, sendTo)
-import qualified Network.Socket.ByteString.IO as G
-import Network.Socket.Types
-
-
-
-
 sendTo :: Socket -> ByteString -> SockAddr -> IO Int
 sendTo = G.sendTo
 
@@ -9775,36 +8079,21 @@ recvFrom :: Socket -> Int -> IO (ByteString, SockAddr)
 recvFrom = G.recvFrom
 
 
-module Network.Socket.ByteString.Lazy (
     send,
     sendAll,
     sendWithFds,
 
     getContents,
     recv,
-) where
 
-import Data.ByteString.Lazy.Internal (
     ByteString (..),
     defaultChunkSize,
  )
-import Network.Socket (ShutdownCmd (..), shutdown)
-import System.IO.Error (catchIOError)
-import System.IO.Unsafe (unsafeInterleaveIO)
-import System.Posix.Types (Fd (..))
-import Prelude hiding (getContents)
 
 #if defined(mingw32_HOST_OS)
-import Network.Socket.ByteString.Lazy.Windows  (send, sendAll)
 #else
-import Network.Socket.ByteString.Lazy.Posix    (send, sendAll)
 #endif
 
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
-import qualified Network.Socket.ByteString as N
-import Network.Socket.Imports
-import Network.Socket.Types
 
 sendWithFds
     :: Socket
@@ -9836,171 +8125,6 @@ recv s nbytes = chunk <$> N.recv s (fromIntegral nbytes)
     chunk k
         | S.null k = Empty
         | otherwise = Chunk k Empty
-
-#if __GLASGOW_HASKELL__ >= 704
-#endif
-Module      :  System.FilePath
-Copyright   :  (c) Neil Mitchell 2005-2014
-License     :  BSD3
-
-Maintainer  :  ndmitchell@gmail.com
-Stability   :  stable
-Portability :  portable
-
-A library for 'FilePath' manipulations, using Posix or Windows filepaths
-depending on the platform.
-
-Both "System.FilePath.Posix" and "System.FilePath.Windows" provide the
-same interface.
-
-Given the example 'FilePath': @\/directory\/file.ext@
-
-We can use the following functions to extract pieces.
-
-* 'takeFileName' gives @\"file.ext\"@
-
-* 'takeDirectory' gives @\"\/directory\"@
-
-* 'takeExtension' gives @\".ext\"@
-
-* 'dropExtension' gives @\"\/directory\/file\"@
-
-* 'takeBaseName' gives @\"file\"@
-
-And we could have built an equivalent path with the following expressions:
-
-* @\"\/directory\" '</>' \"file.ext\"@.
-
-* @\"\/directory\/file" '<.>' \"ext\"@.
-
-* @\"\/directory\/file.txt" '-<.>' \"ext\"@.
-
-Each function in this module is documented with several examples,
-which are also used as tests.
-
-Here are a few examples of using the @filepath@ functions together:
-
-/Example 1:/ Find the possible locations of a Haskell module @Test@ imported from module @Main@:
-
-@['replaceFileName' path_to_main \"Test\" '<.>' ext | ext <- [\"hs\",\"lhs\"] ]@
-
-/Example 2:/ Download a file from @url@ and save it to disk:
-
-@do let file = 'makeValid' url
-  System.Directory.createDirectoryIfMissing True ('takeDirectory' file)@
-
-/Example 3:/ Compile a Haskell file, putting the @.hi@ file under @interface@:
-
-@'takeDirectory' file '</>' \"interface\" '</>' ('takeFileName' file '-<.>' \"hi\")@
-
-References:
-[1] <http://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx Naming Files, Paths and Namespaces> (Microsoft MSDN)
-
-
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
-module System.FilePath(
-    FilePath,
-    pathSeparator, pathSeparators, isPathSeparator,
-    searchPathSeparator, isSearchPathSeparator,
-    extSeparator, isExtSeparator,
-
-    splitSearchPath, getSearchPath,
-
-    splitExtension,
-    takeExtension, replaceExtension, (-<.>), dropExtension, addExtension, hasExtension, (<.>),
-    splitExtensions, dropExtensions, takeExtensions, replaceExtensions, isExtensionOf,
-    stripExtension,
-
-    splitFileName,
-    takeFileName, replaceFileName, dropFileName,
-    takeBaseName, replaceBaseName,
-    takeDirectory, replaceDirectory,
-    combine, (</>),
-    splitPath, joinPath, splitDirectories,
-
-    splitDrive, joinDrive,
-    takeDrive, hasDrive, dropDrive, isDrive,
-
-    hasTrailingPathSeparator,
-    addTrailingPathSeparator,
-    dropTrailingPathSeparator,
-
-    normalise, equalFilePath,
-    makeRelative,
-    isRelative, isAbsolute,
-    isValid, makeValid
-) where
-import System.FilePath.Windows
-#else
-module System.FilePath(
-    FilePath,
-    pathSeparator, pathSeparators, isPathSeparator,
-    searchPathSeparator, isSearchPathSeparator,
-    extSeparator, isExtSeparator,
-
-    splitSearchPath, getSearchPath,
-
-    splitExtension,
-    takeExtension, replaceExtension, (-<.>), dropExtension, addExtension, hasExtension, (<.>),
-    splitExtensions, dropExtensions, takeExtensions, replaceExtensions, isExtensionOf,
-    stripExtension,
-
-    splitFileName,
-    takeFileName, replaceFileName, dropFileName,
-    takeBaseName, replaceBaseName,
-    takeDirectory, replaceDirectory,
-    combine, (</>),
-    splitPath, joinPath, splitDirectories,
-
-    splitDrive, joinDrive,
-    takeDrive, hasDrive, dropDrive, isDrive,
-
-    hasTrailingPathSeparator,
-    addTrailingPathSeparator,
-    dropTrailingPathSeparator,
-
-    normalise, equalFilePath,
-    makeRelative,
-    isRelative, isAbsolute,
-    isValid, makeValid
-) where
-import System.FilePath.Posix
-#endif
-
-
-module System.OsPath.Internal where
-
-import {-# SOURCE #-} System.OsPath
-    ( isValid )
-import System.OsPath.Types
-import qualified System.OsString.Internal as OS
-
-import Control.Monad.Catch
-    ( MonadThrow )
-import Data.ByteString
-    ( ByteString )
-import Language.Haskell.TH.Quote
-    ( QuasiQuoter (..) )
-import Language.Haskell.TH.Syntax
-    ( Lift (..), lift )
-import GHC.IO.Encoding.Failure ( CodingFailureMode(..) )
-
-import System.OsString.Internal.Types
-import System.OsPath.Encoding
-import Control.Monad (when)
-import System.IO
-    ( TextEncoding )
-
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
-import qualified System.OsPath.Windows as PF
-import GHC.IO.Encoding.UTF16 ( mkUTF16le )
-#else
-import qualified System.OsPath.Posix as PF
-import GHC.IO.Encoding.UTF8 ( mkUTF8 )
-#endif
-import GHC.Stack (HasCallStack)
-
-
 
 encodeUtf :: MonadThrow m => FilePath -> m OsPath
 encodeUtf = OS.encodeUtf
@@ -10070,153 +8194,11 @@ osp = QuasiQuoter
   }
 #endif
 
-
 unpack :: OsPath -> [OsChar]
 unpack = OS.unpack
 
-
 pack :: [OsChar] -> OsPath
 pack = OS.pack
-
-
-
-module System.Directory
-   (
-
-      createDirectory
-    , createDirectoryIfMissing
-    , removeDirectory
-    , removeDirectoryRecursive
-    , removePathForcibly
-    , renameDirectory
-    , listDirectory
-    , getDirectoryContents
-    , getCurrentDirectory
-    , setCurrentDirectory
-    , withCurrentDirectory
-
-    , getHomeDirectory
-    , XdgDirectory(..)
-    , getXdgDirectory
-    , XdgDirectoryList(..)
-    , getXdgDirectoryList
-    , getAppUserDataDirectory
-    , getUserDocumentsDirectory
-    , getTemporaryDirectory
-
-    , removeFile
-    , renameFile
-    , renamePath
-    , copyFile
-    , copyFileWithMetadata
-    , getFileSize
-
-    , canonicalizePath
-    , makeAbsolute
-    , makeRelativeToCurrentDirectory
-
-    , doesPathExist
-    , doesFileExist
-    , doesDirectoryExist
-
-    , findExecutable
-    , findExecutables
-    , findExecutablesInDirectories
-    , findFile
-    , findFiles
-    , findFileWith
-    , findFilesWith
-    , exeExtension
-
-    , createFileLink
-    , createDirectoryLink
-    , removeDirectoryLink
-    , pathIsSymbolicLink
-    , getSymbolicLinkTarget
-
-
-
-    , Permissions
-    , emptyPermissions
-    , readable
-    , writable
-    , executable
-    , searchable
-    , setOwnerReadable
-    , setOwnerWritable
-    , setOwnerExecutable
-    , setOwnerSearchable
-
-    , getPermissions
-    , setPermissions
-    , copyPermissions
-
-
-    , getAccessTime
-    , getModificationTime
-    , setAccessTime
-    , setModificationTime
-
-    , isSymbolicLink
-
-   ) where
-import Prelude ()
-import System.Directory.Internal
-import System.Directory.Internal.Prelude
-import Data.Time (UTCTime)
-import System.OsPath (decodeFS, encodeFS)
-import qualified System.Directory.OsPath as D
-
-A directory contains a series of entries, each of which is a named
-reference to a file system object (file, directory etc.).  Some
-entries may be hidden, inaccessible, or have some administrative
-function (e.g. @.@ or @..@ under
-<http://www.opengroup.org/onlinepubs/009695399 POSIX>), but in
-this standard all such entries are considered to form part of the
-directory contents. Entries in sub-directories are not, however,
-considered to form part of the directory contents.
-
-Each file system object is referenced by a /path/.  There is
-normally at least one absolute path to each file system object.  In
-some operating systems, it may also be possible to have paths which
-are relative to the current directory.
-
-Unless otherwise documented:
-
-* 'IO' operations in this package may throw any 'IOError'.  No other types of
-  exceptions shall be thrown.
-
-* The list of possible 'IOErrorType's in the API documentation is not
-  exhaustive.  The full list may vary by platform and/or evolve over time.
-
-
-
-
-directory offers a limited (and quirky) interface for reading and setting file
-and directory permissions; see 'getPermissions' and 'setPermissions' for a
-discussion of their limitations.  Because permissions are very difficult to
-implement portably across different platforms, users who wish to do more
-sophisticated things with permissions are advised to use other,
-platform-specific libraries instead.  For example, if you are only interested
-in permissions on POSIX-like platforms,
-<https://hackage.haskell.org/package/unix/docs/System-Posix-Files.html unix>
-offers much more flexibility.
-
- The 'Permissions' type is used to record whether certain operations are
- permissible on a file\/directory. 'getPermissions' and 'setPermissions'
- get and set these permissions, respectively. Permissions apply both to
- files and directories. For directories, the executable field will be
- 'False', and for files the searchable field will be 'False'. Note that
- directories may be searchable without being readable, if permission has
- been given to use them as part of a path, but not to examine the
- directory contents.
-
-Note that to change some, but not all permissions, a construct on the following lines must be used.
-
->  makeReadable f = do
->     p <- getPermissions f
->     setPermissions f (p {readable = True})
-
 
 emptyPermissions :: Permissions
 emptyPermissions = Permissions {
@@ -10431,57 +8413,6 @@ renameDirectory opath npath = do
   opath' <- encodeFS opath
   npath' <- encodeFS npath
   D.renameDirectory opath' npath'
-
-object from /old/ to /new/.  If the /new/ object already exists, it is
-replaced by the /old/ object.  Neither path may refer to an existing
-directory.
-
-A conformant implementation need not support renaming files in all situations
-(e.g. renaming across different physical devices), but the constraints must be
-documented. On Windows, this does not support renaming across different physical
-devices; if you are looking to do so, consider using 'copyFileWithMetadata' and
-'removeFile'.
-
-On Windows, this calls @MoveFileEx@ with @MOVEFILE_REPLACE_EXISTING@ set,
-which is not guaranteed to be atomic
-(<https://github.com/haskell/directory/issues/109>).
-
-On other platforms, this operation is atomic.
-
-The operation may fail with:
-
-* @HardwareFault@
-A physical I\/O error has occurred.
-@[EIO]@
-
-* @InvalidArgument@
-Either operand is not a valid file name.
-@[ENAMETOOLONG, ELOOP]@
-
-* 'isDoesNotExistError'
-The original file does not exist, or there is no path to the target.
-@[ENOENT, ENOTDIR]@
-
-* 'isPermissionError'
-The process has insufficient privileges to perform the operation.
-@[EROFS, EACCES, EPERM]@
-
-* 'System.IO.isFullError'
-Insufficient resources are available to perform the operation.
-@[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
-
-* @UnsatisfiedConstraints@
-Implementation-dependent constraints are not satisfied.
-@[EBUSY]@
-
-* @UnsupportedOperation@
-The implementation does not support renaming in this situation.
-@[EXDEV]@
-
-* @InappropriateType@
-Either path refers to an existing directory.
-@[ENOTDIR, EISDIR, EINVAL, EEXIST, ENOTEMPTY]@
-
 
 renameFile :: FilePath -> FilePath -> IO ()
 renameFile opath npath = do
@@ -10700,166 +8631,6 @@ getUserDocumentsDirectory = D.getUserDocumentsDirectory >>= decodeFS
 
 getTemporaryDirectory :: IO FilePath
 getTemporaryDirectory = D.getTemporaryDirectory >>= decodeFS
-
-module Data.Set (
-              Set          -- instance Eq,Ord,Show,Read,Data
-
-            , empty
-            , singleton
-            , fromList
-            , fromAscList
-            , fromDescList
-            , fromDistinctAscList
-            , fromDistinctDescList
-            , powerSet
-
-            , insert
-
-            , delete
-
-
-            , alterF
-
-            , member
-            , notMember
-            , lookupLT
-            , lookupGT
-            , lookupLE
-            , lookupGE
-            , S.null
-            , size
-            , isSubsetOf
-            , isProperSubsetOf
-            , disjoint
-
-            , union
-            , unions
-            , difference
-            , (\\)
-            , intersection
-            , intersections
-            , symmetricDifference
-            , cartesianProduct
-            , disjointUnion
-            , Intersection(..)
-
-            , S.filter
-            , takeWhileAntitone
-            , dropWhileAntitone
-            , spanAntitone
-            , partition
-            , split
-            , splitMember
-            , splitRoot
-
-            , lookupIndex
-            , findIndex
-            , elemAt
-            , deleteAt
-            , S.take
-            , S.drop
-            , S.splitAt
-
-            , S.map
-            , mapMonotonic
-
-            , S.foldr
-            , S.foldl
-            , S.foldr'
-            , S.foldl'
-            , fold
-
-            , lookupMin
-            , lookupMax
-            , findMin
-            , findMax
-            , deleteMin
-            , deleteMax
-            , deleteFindMin
-            , deleteFindMax
-            , maxView
-            , minView
-
-
-            , elems
-            , toList
-            , toAscList
-            , toDescList
-
-            , showTree
-            , showTreeWith
-            , valid
-            ) where
-
-import Data.Set.Internal as S
-
-#if __GLASGOW_HASKELL__
-#endif
-
-#include "containers.h"
-
-
-module Data.Tree(
-
-      Tree(..)
-    , Forest
-    , PostOrder(..)
-
-    , unfoldTree
-    , unfoldForest
-    , unfoldTreeM
-    , unfoldForestM
-    , unfoldTreeM_BF
-    , unfoldForestM_BF
-
-    , foldTree
-    , flatten
-    , levels
-    , leaves
-    , edges
-    , pathsToRoot
-    , pathsFromRoot
-
-    , drawTree
-    , drawForest
-
-    ) where
-
-import Utils.Containers.Internal.Prelude as Prelude
-import Prelude ()
-import Data.Bits ((.&.))
-import Data.Foldable (toList)
-import qualified Data.Foldable as Foldable
-import Data.List.NonEmpty (NonEmpty(..))
-import Data.Traversable (foldMapDefault)
-import Control.Monad (liftM)
-import Control.Monad.Fix (MonadFix (..), fix)
-import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList,
-            ViewL(..), ViewR(..), viewl, viewr)
-import Control.DeepSeq (NFData(rnf),NFData1(liftRnf))
-
-#ifdef __GLASGOW_HASKELL__
-import Data.Data (Data)
-import GHC.Generics (Generic, Generic1)
-import qualified GHC.Exts
-import Language.Haskell.TH.Syntax (Lift)
-import Language.Haskell.TH ()
-#endif
-
-import Control.Monad.Zip (MonadZip (..))
-
-#ifdef __GLASGOW_HASKELL__
-import Data.Coerce (coerce)
-#endif
-import Data.Functor.Classes
-
-#if !MIN_VERSION_base(4,11,0)
-import Data.Semigroup (Semigroup (..))
-#endif
-
-#if MIN_VERSION_base(4,18,0)
-import qualified Data.Foldable1 as Foldable1
-#endif
 
 data Tree a = Node {
         rootLabel :: a,         -- ^ label value
@@ -11269,106 +9040,21 @@ foldlMap1'PostOrder f g = \(PostOrder t) -> go t
       in g z' x
 
 
-
-
-
-#include "containers.h"
-#if __GLASGOW_HASKELL__
-#endif
-#ifdef DEFINE_PATTERN_SYNONYMS
-#endif
-#ifdef USE_ST_MONAD
-#endif
-
-
-module Data.Graph (
-
-      Graph
-    , Bounds
-    , Edge
-    , Vertex
-    , Table
-
-    , graphFromEdges
-    , graphFromEdges'
-    , buildG
-
-    , vertices
-    , edges
-    , outdegree
-    , indegree
-
-    , transposeG
-
-    , dfs
-    , dff
-    , topSort
-    , reverseTopSort
-    , components
-    , scc
-    , bcc
-    , reachable
-    , path
-
-
-    , SCC(..
-#ifdef DEFINE_PATTERN_SYNONYMS
-      , CyclicSCC
-#endif
-      )
-
-    , stronglyConnComp
-    , stronglyConnCompR
-
-    , flattenSCC
-    , flattenSCC1
-    , flattenSCCs
-
-    , module Data.Tree
-
-    ) where
-
-import Utils.Containers.Internal.Prelude
-import Prelude ()
 #if USE_ST_MONAD
-import Control.Monad.ST
-import Data.Array.ST.Safe (newArray, readArray, writeArray)
 # if USE_UNBOXED_ARRAYS
-import Data.Array.ST.Safe (STUArray)
 # else
-import Data.Array.ST.Safe (STArray)
 # endif
 #else
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as Set
 #endif
-import Data.Tree (Tree(Node), Forest)
 
-import Data.Foldable as F
 #if MIN_VERSION_base(4,18,0)
-import qualified Data.Foldable1 as F1
 #endif
-import Control.DeepSeq (NFData(rnf),NFData1(liftRnf))
-import Data.Maybe
-import Data.Array
 #if USE_UNBOXED_ARRAYS
-import qualified Data.Array.Unboxed as UA
-import Data.Array.Unboxed ( UArray )
 #else
-import qualified Data.Array as UA
 #endif
-import qualified Data.List as L
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import Data.Functor.Classes
 #if !MIN_VERSION_base(4,11,0)
-import Data.Semigroup (Semigroup (..))
 #endif
 #ifdef __GLASGOW_HASKELL__
-import GHC.Generics (Generic, Generic1)
-import Data.Data (Data)
-import Language.Haskell.TH.Syntax (Lift(..))
-import Language.Haskell.TH ()
 #endif
 
 default ()
@@ -11730,217 +9416,6 @@ bcc g = concatMap bicomps forest
             !lowv'' = min lowv' loww
         !lowv0 = F.foldl' min dv [dnum UA.! w | w <- g!v]
         !(lowv, curv, donev) = F.foldl' accf (lowv0, id, id) tws
-
-
-
-
-
-
-module Data.ByteString (
-
-        ByteString,
-        StrictByteString,
-
-
-        empty,
-        singleton,
-        pack,
-        unpack,
-        fromStrict,
-        toStrict,
-        fromFilePath,
-        toFilePath,
-
-        cons,
-        snoc,
-        append,
-        head,
-        uncons,
-        unsnoc,
-        last,
-        tail,
-        init,
-        null,
-        length,
-
-        map,
-        reverse,
-        intersperse,
-        intercalate,
-        transpose,
-
-        foldl,
-        foldl',
-        foldl1,
-        foldl1',
-
-        foldr,
-        foldr',
-        foldr1,
-        foldr1',
-
-        concat,
-        concatMap,
-        any,
-        all,
-        maximum,
-        minimum,
-
-        scanl,
-        scanl1,
-        scanr,
-        scanr1,
-
-        mapAccumL,
-        mapAccumR,
-
-        replicate,
-        unfoldr,
-        unfoldrN,
-
-
-        take,
-        takeEnd,
-        drop,
-        dropEnd,
-        splitAt,
-        takeWhile,
-        takeWhileEnd,
-        dropWhile,
-        dropWhileEnd,
-        span,
-        spanEnd,
-        break,
-        breakEnd,
-        group,
-        groupBy,
-        inits,
-        tails,
-        initsNE,
-        tailsNE,
-        stripPrefix,
-        stripSuffix,
-
-        split,
-        splitWith,
-
-        isPrefixOf,
-        isSuffixOf,
-        isInfixOf,
-
-        isValidUtf8,
-
-        breakSubstring,
-
-
-        elem,
-        notElem,
-
-        find,
-        filter,
-        partition,
-
-        index,
-        indexMaybe,
-        (!?),
-        elemIndex,
-        elemIndices,
-        elemIndexEnd,
-        findIndex,
-        findIndices,
-        findIndexEnd,
-        count,
-
-        zip,
-        zipWith,
-        packZipWith,
-        unzip,
-
-        sort,
-
-        copy,
-
-        packCString,
-        packCStringLen,
-
-        useAsCString,
-        useAsCStringLen,
-
-
-        getLine,
-        getContents,
-        putStr,
-        interact,
-
-        readFile,
-        writeFile,
-        appendFile,
-
-        hGetLine,
-        hGetContents,
-        hGet,
-        hGetSome,
-        hGetNonBlocking,
-        hPut,
-        hPutNonBlocking,
-        hPutStr,
-  ) where
-
-import qualified Prelude as P
-import Prelude hiding           (reverse,head,tail,last,init,Foldable(..)
-                                ,map,lines,unlines
-                                ,concat,any,take,drop,splitAt,takeWhile
-                                ,dropWhile,span,break,filter
-                                ,all,concatMap
-                                ,scanl,scanl1,scanr,scanr1
-                                ,readFile,writeFile,appendFile,replicate
-                                ,getContents,getLine,putStr,putStrLn,interact
-                                ,zip,zipWith,unzip,notElem
-                                )
-
-import Data.Bits                (finiteBitSize, shiftL, (.|.), (.&.))
-
-import Data.ByteString.Internal.Type
-import Data.ByteString.Lazy.Internal (fromStrict, toStrict)
-import Data.ByteString.Unsafe
-
-import qualified Data.List as List
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
-
-import Data.Word                (Word8)
-
-import Control.Exception        (IOException, catch, finally, assert, throwIO)
-import Control.Monad            (when)
-
-import Foreign.C.String         (CString, CStringLen)
-import Foreign.ForeignPtr       (ForeignPtr, touchForeignPtr)
-import Foreign.ForeignPtr.Unsafe(unsafeForeignPtrToPtr)
-import Foreign.Marshal.Alloc    (allocaBytes)
-import Foreign.Marshal.Array    (allocaArray)
-import Foreign.Marshal.Utils
-import Foreign.Ptr
-import Foreign.Storable         (Storable(..))
-
-import System.IO                (stdin,stdout,hClose,hFileSize
-                                ,hGetBuf,hPutBuf,hGetBufNonBlocking
-                                ,hPutBufNonBlocking,withBinaryFile
-                                ,IOMode(..),hGetBufSome)
-import System.IO.Error          (mkIOError, illegalOperationErrorType)
-
-import Data.IORef
-import GHC.IO.Handle.Internals
-import GHC.IO.Handle.Types
-import GHC.IO.Buffer
-import GHC.IO.BufferedIO as Buffered
-import GHC.IO.Encoding          (getFileSystemEncoding)
-import GHC.Foreign              (newCStringLen, peekCStringLen)
-import GHC.Stack.Types          (HasCallStack)
-import Data.Char                (ord)
-
-import GHC.Base                 (build)
-import GHC.Word hiding (Word8)
-
 
 singleton :: Word8 -> ByteString
 singleton c = unsafeTake 1 $ unsafeDrop (fromIntegral c) allBytes
@@ -12832,7 +10307,6 @@ packCStringLen :: CStringLen -> IO ByteString
 packCStringLen (cstr, len) | len >= 0 = createFp len $ \fp ->
     unsafeWithForeignPtr fp $ \p -> copyBytes p (castPtr cstr) len
 packCStringLen (_, len) =
-    moduleErrorIO "packCStringLen" ("negative length: " ++ show len)
 
 
 copy :: ByteString -> ByteString
@@ -12996,14 +10470,8 @@ appendFile = modifyFile AppendMode
 errorEmptyList :: HasCallStack => String -> a
 errorEmptyList fun = moduleError fun "empty ByteString"
 
-moduleError :: HasCallStack => String -> String -> a
-moduleError fun msg = error (moduleErrorMsg fun msg)
 
-moduleErrorIO :: HasCallStack => String -> String -> IO a
-moduleErrorIO fun msg = throwIO . userError $ moduleErrorMsg fun msg
 
-moduleErrorMsg :: String -> String -> String
-moduleErrorMsg fun msg = "Data.ByteString." ++ fun ++ ':':' ':msg
 
 findFromEndUntil :: (Word8 -> Bool) -> ByteString -> Int
 findFromEndUntil f ps@(BS _ l) = case unsnoc ps of
@@ -13012,251 +10480,6 @@ findFromEndUntil f ps@(BS _ l) = case unsnoc ps of
     if f c
       then l
       else findFromEndUntil f b
-
-
-module Data.ByteString.Internal (
-
-        ByteString
-        ( BS
-        , PS -- backwards compatibility shim
-        ),
-
-        StrictByteString,
-
-        findIndexOrLength,
-
-        packBytes, packUptoLenBytes, unsafePackLenBytes,
-        packChars, packUptoLenChars, unsafePackLenChars,
-        unpackBytes, unpackAppendBytesLazy, unpackAppendBytesStrict,
-        unpackChars, unpackAppendCharsLazy, unpackAppendCharsStrict,
-        unsafePackAddress, unsafePackLenAddress,
-        unsafePackLiteral, unsafePackLenLiteral,
-
-        empty,
-        create,
-        createUptoN,
-        createUptoN',
-        createAndTrim,
-        createAndTrim',
-        unsafeCreate,
-        unsafeCreateUptoN,
-        unsafeCreateUptoN',
-        mallocByteString,
-
-        mkDeferredByteString,
-        fromForeignPtr,
-        toForeignPtr,
-        fromForeignPtr0,
-        toForeignPtr0,
-
-        nullForeignPtr,
-        deferForeignPtrAvailability,
-        SizeOverflowException,
-        overflowError,
-        checkedAdd,
-        checkedMultiply,
-
-        c_strlen,
-        c_free_finalizer,
-
-        memchr,
-        memcmp,
-        memcpy,
-        memset,
-
-        c_reverse,
-        c_intersperse,
-        c_maximum,
-        c_minimum,
-        c_count,
-        c_sort,
-
-        w2c, c2w, isSpaceWord8, isSpaceChar8,
-
-        accursedUnutterablePerformIO,
-
-        plusForeignPtr,
-        unsafeWithForeignPtr
-  ) where
-
-import Data.ByteString.Internal.Type
-
-
-
-
-module Data.ByteString.Lazy (
-
-        ByteString,
-        LazyByteString,
-
-        empty,
-        singleton,
-        pack,
-        unpack,
-        fromStrict,
-        toStrict,
-        fromChunks,
-        toChunks,
-        foldrChunks,
-        foldlChunks,
-
-        cons,
-        cons',
-        snoc,
-        append,
-        head,
-        uncons,
-        unsnoc,
-        last,
-        tail,
-        init,
-        null,
-        length,
-
-        map,
-        reverse,
-        intersperse,
-        intercalate,
-        transpose,
-
-        foldl,
-        foldl',
-        foldl1,
-        foldl1',
-        foldr,
-        foldr',
-        foldr1,
-        foldr1',
-
-        concat,
-        concatMap,
-        any,
-        all,
-        maximum,
-        minimum,
-        compareLength,
-
-        scanl,
-        scanl1,
-        scanr,
-        scanr1,
-
-        mapAccumL,
-        mapAccumR,
-
-        repeat,
-        replicate,
-        cycle,
-        iterate,
-
-        unfoldr,
-
-
-        take,
-        takeEnd,
-        drop,
-        dropEnd,
-        splitAt,
-        takeWhile,
-        takeWhileEnd,
-        dropWhile,
-        dropWhileEnd,
-        span,
-        spanEnd,
-        break,
-        breakEnd,
-        group,
-        groupBy,
-        inits,
-        tails,
-        initsNE,
-        tailsNE,
-        stripPrefix,
-        stripSuffix,
-
-        split,
-        splitWith,
-
-        isPrefixOf,
-        isSuffixOf,
-
-
-
-        elem,
-        notElem,
-
-        find,
-        filter,
-        partition,
-
-        index,
-        indexMaybe,
-        (!?),
-        elemIndex,
-        elemIndexEnd,
-        elemIndices,
-        findIndex,
-        findIndexEnd,
-        findIndices,
-        count,
-
-        zip,
-        zipWith,
-        packZipWith,
-        unzip,
-
-
-        copy,
-
-
-        getContents,
-        putStr,
-        interact,
-
-        readFile,
-        writeFile,
-        appendFile,
-
-        hGetContents,
-        hGet,
-        hGetNonBlocking,
-        hPut,
-        hPutNonBlocking,
-        hPutStr,
-
-  ) where
-
-import Prelude hiding
-    (reverse,head,tail,last,init,Foldable(..),map,lines,unlines
-    ,concat,any,take,drop,splitAt,takeWhile,dropWhile,span,break,filter
-    ,all,concatMap,scanl, scanl1, scanr, scanr1
-    ,repeat, cycle, interact, iterate,readFile,writeFile,appendFile,replicate
-    ,getContents,getLine,putStr,putStrLn ,zip,zipWith,unzip,notElem)
-
-import qualified Data.List              as List
-import qualified Data.List.NonEmpty     as NE
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.Bifunctor         as BF
-import qualified Data.ByteString        as P  (ByteString) -- type name only
-import qualified Data.ByteString        as S  -- S for strict (hmm...)
-import qualified Data.ByteString.Internal.Type as S
-import qualified Data.ByteString.Unsafe as S
-import Data.ByteString.Lazy.Internal
-
-import Control.Exception        (assert)
-import Control.Monad            (mplus)
-import Data.Word                (Word8)
-import Data.Int                 (Int64)
-import GHC.Stack.Types          (HasCallStack)
-import System.IO                (Handle,openBinaryFile,stdin,stdout,withBinaryFile,IOMode(..)
-                                ,hClose)
-import System.IO.Error          (mkIOError, illegalOperationErrorType)
-import System.IO.Unsafe
-
-import Foreign.Ptr
-import Foreign.Storable
-
-
 
 empty :: ByteString
 empty = Empty
@@ -13276,13 +10499,11 @@ fromChunks = List.foldr chunk Empty
 toChunks :: LazyByteString -> [S.StrictByteString]
 toChunks = foldrChunks (:) []
 
-
 packWith :: (a -> Word8) -> [a] -> ByteString
 packWith k str = LPS $ L.map (P.packWith k) (chunk defaultChunkSize str)
 
 unpackWith :: (Word8 -> a) -> ByteString -> [a]
 unpackWith k (LPS ss) = L.concatMap (S.unpackWith k) ss
-
 
 null :: ByteString -> Bool
 null Empty = True
@@ -13623,7 +10844,6 @@ splitAtEndFold step end len bs0 = assert (len > 0) $ case bs0 of
 
 splitAtEndFoldInvariantFailed :: a
 splitAtEndFoldInvariantFailed =
-  moduleError "splitAtEndFold"
               "internal error: toSplit not longer than toScan"
 
 drop  :: Int64 -> ByteString -> ByteString
@@ -14089,8 +11309,6 @@ interact transformer = putStr . transformer =<< getContents
 errorEmptyList :: HasCallStack => String -> a
 errorEmptyList fun = moduleError fun "empty ByteString"
 
-moduleError :: HasCallStack => String -> String -> a
-moduleError fun msg = error ("Data.ByteString.Lazy." ++ fun ++ ':':' ':msg)
 
 
 revNonEmptyChunks :: [P.ByteString] -> ByteString
@@ -14101,48 +11319,6 @@ revChunks = List.foldl' (flip chunk) Empty
 
 intToInt64 :: Int -> Int64
 intToInt64 = fromIntegral @Int @Int64
-
-
-module Data.Binary (
-
-      Binary(..)
-
-    , GBinaryGet(..)
-    , GBinaryPut(..)
-
-    , Get
-    , Put
-
-    , putWord8
-    , getWord8
-
-    , encode                    -- :: Binary a => a -> ByteString
-    , decode                    -- :: Binary a => ByteString -> a
-    , decodeOrFail
-
-    , encodeFile                -- :: Binary a => FilePath -> a -> IO ()
-    , decodeFile                -- :: Binary a => FilePath -> IO a
-    , decodeFileOrFail
-
-    , module Data.Word -- useful
-
-    ) where
-
-import Data.Word
-
-import Data.Binary.Class
-import Data.Binary.Put
-import Data.Binary.Get
-import Data.Binary.Generic ()
-
-import qualified Data.ByteString as B ( hGet, length )
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Lazy.Internal as L ( defaultChunkSize )
-import System.IO ( withBinaryFile, IOMode(ReadMode) )
-
-
-
 
 encode :: Binary a => a -> ByteString
 encode = runPut . put
@@ -14181,159 +11357,10 @@ decodeFileOrFail f =
         _ -> feed (k (Just chunk)) h
 
 
-
-
-module Control.Monad
-    (-- *  Functor and monad classes
-     Functor(..),
-     Monad((>>=), (>>), return),
-     MonadFail(fail),
-     MonadPlus(mzero, mplus),
-     mapM,
-     mapM_,
-     forM,
-     forM_,
-     sequence,
-     sequence_,
-     (=<<),
-     (>=>),
-     (<=<),
-     forever,
-     void,
-     join,
-     msum,
-     mfilter,
-     filterM,
-     mapAndUnzipM,
-     zipWithM,
-     zipWithM_,
-     foldM,
-     foldM_,
-     replicateM,
-     replicateM_,
-     guard,
-     when,
-     unless,
-     liftM,
-     liftM2,
-     liftM3,
-     liftM4,
-     liftM5,
-     ap,
-     (<$!>)
-     ) where
-
-import GHC.Internal.Control.Monad
-
-
-The functions in this module use the following naming conventions:
-
-* A postfix \'@M@\' always stands for a function in the Kleisli category:
-  The monad type constructor @m@ is added to function results
-  (modulo currying) and nowhere else.  So, for example,
-
-> filter  ::              (a ->   Bool) -> [a] ->   [a]
-> filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-
-* A postfix \'@_@\' changes the result type from @(m a)@ to @(m ())@.
-  Thus, for example:
-
-> sequence  :: Monad m => [m a] -> m [a]
-> sequence_ :: Monad m => [m a] -> m ()
-
-* A prefix \'@m@\' generalizes an existing function to a monadic form.
-  Thus, for example:
-
-> filter  ::                (a -> Bool) -> [a] -> [a]
-> mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a
-
-
-           , MagicHash
-           , UnboxedTuples
-           , ScopedTypeVariables
-           , RankNTypes
-
-
-module Control.Concurrent (
-
-
-
-        ThreadId,
-        myThreadId,
-
-        forkIO,
-        forkFinally,
-        forkIOWithUnmask,
-        killThread,
-        throwTo,
-
-        forkOn,
-        forkOnWithUnmask,
-        getNumCapabilities,
-        setNumCapabilities,
-        threadCapability,
-
-
-        yield,
-
-
-
-        threadDelay,
-        threadWaitRead,
-        threadWaitWrite,
-        threadWaitReadSTM,
-        threadWaitWriteSTM,
-
-
-        module GHC.Internal.Control.Concurrent.MVar,
-        module Control.Concurrent.Chan,
-        module Control.Concurrent.QSem,
-        module Control.Concurrent.QSemN,
-
-        rtsSupportsBoundThreads,
-        forkOS,
-        forkOSWithUnmask,
-        isCurrentThreadBound,
-        runInBoundThread,
-        runInUnboundThread,
-
-        mkWeakThreadId,
-
-
-
-
-
-
-
-
-
-
-
-    ) where
-
-import Prelude
-import GHC.Internal.Control.Exception.Base as Exception
-
-import GHC.Internal.Conc.Bound
-import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
-                        threadWaitReadSTM, threadWaitWriteSTM)
-
-import GHC.Internal.System.Posix.Types ( Fd )
-
 #if defined(mingw32_HOST_OS)
-import GHC.Internal.Foreign.C.Error
-import GHC.Internal.Foreign.C.Types
-import GHC.Internal.System.IO
-import GHC.Internal.Data.Functor ( void )
-import GHC.Internal.Int ( Int64 )
 #else
-import qualified GHC.Internal.Conc.IO as Conc
 #endif
 
-import GHC.Internal.Control.Concurrent.MVar
-import Control.Concurrent.Chan
-import Control.Concurrent.QSem
-import Control.Concurrent.QSemN
 
 forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
 forkFinally action and_then =
@@ -14421,191 +11448,6 @@ foreign import ccall safe "fdReady"
   fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 #endif
 
-
-
-      #osthreads# In GHC, threads created by 'forkIO' are lightweight threads, and
-      are managed entirely by the GHC runtime.  Typically Haskell
-      threads are an order of magnitude or two more efficient (in
-      terms of both time and space) than operating system threads.
-
-      The downside of having lightweight threads is that only one can
-      run at a time, so if one thread blocks in a foreign call, for
-      example, the other threads cannot continue.  The GHC runtime
-      works around this by making use of full OS threads where
-      necessary.  When the program is built with the @-threaded@
-      option (to link against the multithreaded version of the
-      runtime), a thread making a @safe@ foreign call will not block
-      the other threads in the system; another OS thread will take
-      over running Haskell threads until the original call returns.
-      The runtime maintains a pool of these /worker/ threads so that
-      multiple Haskell threads can be involved in external calls
-      simultaneously.
-
-      The "System.IO" module manages multiplexing in its own way.  On
-      Windows systems it uses @safe@ foreign calls to ensure that
-      threads doing I\/O operations don't block the whole runtime,
-      whereas on Unix systems all the currently blocked I\/O requests
-      are managed by a single thread (the /IO manager thread/) using
-      a mechanism such as @epoll@ or @kqueue@, depending on what is
-      provided by the host operating system.
-
-      The runtime will run a Haskell thread using any of the available
-      worker OS threads.  If you need control over which particular OS
-      thread is used to run a given Haskell thread, perhaps because
-      you need to call a foreign library that uses OS-thread-local
-      state, then you need bound threads (see "Control.Concurrent#boundthreads").
-
-      If you don't use the @-threaded@ option, then the runtime does
-      not make use of multiple OS threads.  Foreign calls will block
-      all other running Haskell threads until the call returns.  The
-      "System.IO" module still does multiplexing, so there can be multiple
-      threads doing I\/O, and this is handled internally by the runtime using
-      @select@.
-
-
-      In a standalone GHC program, only the main thread is
-      required to terminate in order for the process to terminate.
-      Thus all other forked threads will simply terminate at the same
-      time as the main thread (the terminology for this kind of
-      behaviour is \"daemonic threads\").
-
-      If you want the program to wait for child threads to
-      finish before exiting, you need to program this yourself.  A
-      simple mechanism is to have each child thread write to an
-      'MVar' when it completes, and have the main
-      thread wait on all the 'MVar's before
-      exiting:
-
->   myForkIO :: IO () -> IO (MVar ())
->   myForkIO io = do
->     mvar <- newEmptyMVar
->     forkFinally io (\_ -> putMVar mvar ())
->     return mvar
-
-      Note that we use 'forkFinally' to make sure that the
-      'MVar' is written to even if the thread dies or
-      is killed for some reason.
-
-      A better method is to keep a global list of all child
-      threads which we should wait for at the end of the program:
-
->    children :: MVar [MVar ()]
->    children = unsafePerformIO (newMVar [])
->
->    waitForChildren :: IO ()
->    waitForChildren = do
->      cs <- takeMVar children
->      case cs of
->        []   -> return ()
->        m:ms -> do
->           putMVar children ms
->           takeMVar m
->           waitForChildren
->
->    forkChild :: IO () -> IO ThreadId
->    forkChild io = do
->        mvar <- newEmptyMVar
->        childs <- takeMVar children
->        putMVar children (mvar:childs)
->        forkFinally io (\_ -> putMVar mvar ())
->
->     main =
->       later waitForChildren $
->       ...
-
-      The main thread principle also applies to calls to Haskell from
-      outside, using @foreign export@.  When the @foreign export@ed
-      function is invoked, it starts a new main thread, and it returns
-      when this main thread terminates.  If the call causes new
-      threads to be forked, they may remain in the system after the
-      @foreign export@ed function has returned.
-
-
-      GHC implements pre-emptive multitasking: the execution of
-      threads are interleaved in a random fashion.  More specifically,
-      a thread may be pre-empted whenever it allocates some memory,
-      which unfortunately means that tight loops which do no
-      allocation tend to lock out other threads (this only seems to
-      happen with pathological benchmark-style code, however).
-
-      The rescheduling timer runs on a 20ms granularity by
-      default, but this may be altered using the
-      @-i\<n\>@ RTS option.  After a rescheduling
-      \"tick\" the running thread is pre-empted as soon as
-      possible.
-
-      One final note: the
-      @aaaa@ @bbbb@ example may not
-      work too well on GHC (see Scheduling, above), due
-      to the locking on a 'System.IO.Handle'.  Only one thread
-      may hold the lock on a 'System.IO.Handle' at any one
-      time, so if a reschedule happens while a thread is holding the
-      lock, the other thread won't be able to run.  The upshot is that
-      the switch from @aaaa@ to
-      @bbbbb@ happens infrequently.  It can be
-      improved by lowering the reschedule tick period.  We also have a
-      patch that causes a reschedule whenever a thread waiting on a
-      lock is woken up, but haven't found it to be useful for anything
-      other than this example :-)
-
-
-GHC attempts to detect when threads are deadlocked using the garbage
-collector.  A thread that is not reachable (cannot be found by
-following pointers from live objects) must be deadlocked, and in this
-case the thread is sent an exception.  The exception is either
-'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM',
-'NonTermination', or 'Deadlock', depending on the way in which the
-thread is deadlocked.
-
-Note that this feature is intended for debugging, and should not be
-relied on for the correct operation of your program.  There is no
-guarantee that the garbage collector will be accurate enough to detect
-your deadlock, and no guarantee that the garbage collector will run in
-a timely enough manner.  Basically, the same caveats as for finalizers
-apply to deadlock detection.
-
-There is a subtle interaction between deadlock detection and
-finalizers (as created by 'GHC.Foreign.Concurrent.newForeignPtr' or the
-functions in "System.Mem.Weak"): if a thread is blocked waiting for a
-finalizer to run, then the thread will be considered deadlocked and
-sent an exception.  So preferably don't do this, but if you have no
-alternative then it is possible to prevent the thread from being
-considered deadlocked by making a 'StablePtr' pointing to it.  Don't
-forget to release the 'StablePtr' later with 'freeStablePtr'.
-
-
-
-module Control.Applicative (
-    Applicative(..),
-    Alternative(..),
-    Const(..), WrappedMonad(..), WrappedArrow(..), ZipList(..),
-    (<$>), (<$), (<**>),
-    liftA, liftA3,
-    optional,
-    asum,
-    ) where
-
-import GHC.Internal.Control.Category hiding ((.), id)
-import GHC.Internal.Control.Arrow
-import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Tuple
-import GHC.Internal.Data.Foldable (asum)
-import GHC.Internal.Data.Functor ((<$>))
-import GHC.Internal.Data.Functor.Const (Const(..))
-import GHC.Internal.Data.Typeable (Typeable)
-import GHC.Internal.Data.Data (Data)
-
-import GHC.Internal.Base
-import GHC.Internal.Functor.ZipList (ZipList(..))
-import GHC.Generics
-
-
-newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
-                         deriving ( Generic  -- ^ @since 4.7.0.0
-                                  , Generic1 -- ^ @since 4.7.0.0
-                                  , Monad    -- ^ @since 4.7.0.0
-                                  )
-
 instance Monad m => Functor (WrappedMonad m) where
     fmap f (WrapMonad v) = WrapMonad (liftM f v)
 
@@ -14642,135 +11484,8 @@ deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
                    Data (a b c))
          => Data (WrappedArrow a b c)
 
-
-
 optional :: Alternative f => f a -> f (Maybe a)
 optional v = Just <$> v <|> pure Nothing
-
-
-#include "lens-common.h"
-module Control.Lens.Fold
-  (
-    Fold
-  , IndexedFold
-
-  , (^..)
-  , (^?)
-  , (^?!)
-  , pre, ipre
-  , preview, previews, ipreview, ipreviews
-  , preuse, preuses, ipreuse, ipreuses
-
-  , has, hasn't
-
-  , folding, ifolding
-  , foldring, ifoldring
-  , folded
-  , folded64
-  , unfolded
-  , iterated
-  , filtered
-  , filteredBy
-  , backwards
-  , repeated
-  , replicated
-  , cycled
-  , takingWhile
-  , droppingWhile
-  , worded, lined
-
-  , foldMapOf, foldOf
-  , foldrOf, foldlOf
-  , toListOf, toNonEmptyOf
-  , altOf
-  , anyOf, allOf, noneOf
-  , andOf, orOf
-  , productOf, sumOf
-  , traverseOf_, forOf_, sequenceAOf_
-  , traverse1Of_, for1Of_, sequence1Of_
-  , mapMOf_, forMOf_, sequenceOf_
-  , asumOf, msumOf
-  , concatMapOf, concatOf
-  , elemOf, notElemOf
-  , lengthOf
-  , nullOf, notNullOf
-  , firstOf, first1Of, lastOf, last1Of
-  , maximumOf, maximum1Of, minimumOf, minimum1Of
-  , maximumByOf, minimumByOf
-  , findOf
-  , findMOf
-  , foldrOf', foldlOf'
-  , foldr1Of, foldl1Of
-  , foldr1Of', foldl1Of'
-  , foldrMOf, foldlMOf
-  , lookupOf
-
-  , (^@..)
-  , (^@?)
-  , (^@?!)
-
-  , ifoldMapOf
-  , ifoldrOf
-  , ifoldlOf
-  , ianyOf
-  , iallOf
-  , inoneOf
-  , itraverseOf_
-  , iforOf_
-  , imapMOf_
-  , iforMOf_
-  , iconcatMapOf
-  , ifindOf
-  , ifindMOf
-  , ifoldrOf'
-  , ifoldlOf'
-  , ifoldrMOf
-  , ifoldlMOf
-  , itoListOf
-  , elemIndexOf
-  , elemIndicesOf
-  , findIndexOf
-  , findIndicesOf
-
-  , ifiltered
-  , itakingWhile
-  , idroppingWhile
-
-  , Leftmost
-  , Rightmost
-  , Traversed
-  , Sequenced
-
-  , foldBy
-  , foldByOf
-  , foldMapBy
-  , foldMapByOf
-  ) where
-
-import Prelude ()
-
-import Control.Applicative.Backwards
-import Control.Comonad
-import Control.Lens.Getter
-import Control.Lens.Internal.Fold
-import Control.Lens.Internal.Getter
-import Control.Lens.Internal.Indexed
-import Control.Lens.Internal.Magma
-import Control.Lens.Internal.Prelude
-import Control.Lens.Type
-import Control.Monad as Monad
-import Control.Monad.Reader
-import Control.Monad.State
-import Data.CallStack
-import Data.Functor.Apply hiding ((<.))
-import Data.Int (Int64)
-import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
-import Data.Monoid (First (..), All (..), Alt (..), Any (..))
-import Data.Reflection
-
-import qualified Data.Semigroup as Semi
-
 
 infixl 8 ^.., ^?, ^?!, ^@.., ^@?, ^@?!
 
@@ -15156,7 +11871,6 @@ ifoldlMOf l f z0 xs = ifoldrOf l f' return xs z0
 itoListOf :: IndexedGetting i (Endo [(i,a)]) s a -> s -> [(i,a)]
 itoListOf l = ifoldrOf l (\i a -> ((i,a):)) []
 
-
 (^@..) :: s -> IndexedGetting i (Endo [(i,a)]) s a -> [(i,a)]
 s ^@.. l = ifoldrOf l (\i a -> ((i,a):)) [] s
 
@@ -15178,7 +11892,6 @@ findIndexOf l p = preview (l . filtered p . asIndex)
 findIndicesOf :: IndexedGetting i (Endo [i]) s a -> (a -> Bool) -> s -> [i]
 findIndicesOf l p = toListOf (l . filtered p . asIndex)
 
-
 ifiltered :: (Indexable i p, Applicative f) => (i -> a -> Bool) -> Optical' p (Indexed i) f a a
 ifiltered p f = Indexed $ \i a -> if p i a then indexed f i a else pure a
 
@@ -15198,10 +11911,8 @@ idroppingWhile p l f = (flip evalState True .# getCompose) `rmap` l g where
       b' = b && p i a
     in (if b' then pure a else indexed f i a, b')
 
-
 skip :: a -> ()
 skip _ = ()
-
 
 foldByOf :: Fold s a -> (a -> a -> a) -> a -> s -> a
 foldByOf l f z = reifyMonoid f z (foldMapOf l ReflectedMonoid)

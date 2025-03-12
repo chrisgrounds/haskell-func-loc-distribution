@@ -58,8 +58,14 @@ def count_haskell_function_loc(file_path):
         
         if stripped.startswith("let"):
             continue
+    
+        if stripped.endswith(","):
+            continue
 
-        match = re.match(r"^(\w+)(\s+[\w|']+)*\s*=", stripped)
+        if stripped.startswith("instance"):
+            continue
+
+        match = re.match(r"^(\w+)(\s+[\w|']+)*\s*=[\r\n|\s]+", stripped)
         if match:
             if current_function:
                 function_locs[current_function] = loc_count
@@ -87,6 +93,10 @@ filtered_lines = [
         or line.strip().startswith("-}")
         or line.strip().startswith("#-}")
         or line.strip().endswith("-}")
+        or line.strip().startswith("import")
+        or line.strip().startswith("qualified")
+        or line.strip().startswith("module")
+        or line.strip().startswith(") where")
     )
 ]
 
@@ -95,8 +105,11 @@ with open(file_path, 'w') as f:
 
 loc_counts = dict(sorted(count_haskell_function_loc(file_path).items(), key=lambda x: x[1], reverse=True))
 
-with open('out_raw.json', 'w') as f:
-    json.dump(loc_counts, f, indent=2)
+# with open('out_raw.json', 'w') as f:
+#     json.dump(loc_counts, f, indent=2)
+
+with open('out_raw.json', 'r') as f:
+    loc_counts = json.load(f)
 
 histogram = {}
 for loc in sorted(loc_counts.values()):
