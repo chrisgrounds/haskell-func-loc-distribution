@@ -10,6 +10,7 @@ def count_haskell_function_loc(file_path):
     current_function = None
     loc_count = 0
     multi_line_comment = False
+    module_declaration = False
     
     for line in lines:
         stripped = line.strip()
@@ -21,6 +22,15 @@ def count_haskell_function_loc(file_path):
             multi_line_comment = False
             continue
         if multi_line_comment:
+            continue
+
+        # remove module declarations
+        if "module " in stripped:
+            module_declaration = True
+        if "where" in stripped:
+            module_declaration = False
+            continue
+        if module_declaration:
             continue
 
         if stripped.startswith("--") or not stripped:
@@ -42,6 +52,9 @@ def count_haskell_function_loc(file_path):
         
         if stripped.startswith("let"):
             continue
+
+
+
 
         # Match function definitions (without indentation)
         match = re.match(r"^(\w+)(\s+[\w|']+)*\s*=\s", stripped)
