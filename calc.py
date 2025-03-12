@@ -76,19 +76,21 @@ def count_haskell_function_loc(file_path):
 file_path = "aeson.hs"
 loc_counts = dict(sorted(count_haskell_function_loc(file_path).items(), key=lambda x: x[1], reverse=True))
 
-with open('out.json', 'w') as f:
+with open('out_raw.json', 'w') as f:
     json.dump(loc_counts, f, indent=2)
 
-# Get top 20 functions by LOC for better readability
-top_20_functions = dict(list(loc_counts.items())[:20])
+histogram = {}
+for loc in sorted(loc_counts.values()):
+    histogram[loc] = histogram.get(loc, 0) + 1
+
+with open('out_histogram.json', 'w') as f:
+    json.dump(histogram, f, indent=2)
 
 plt.figure(figsize=(15, 8))
 plt.hist(list(loc_counts.values()), bins=range(1, max(loc_counts.values()) + 2), align='left')
 plt.xlabel('Lines of Code')
 plt.ylabel('Number of Functions')
-plt.title('Distribution of Function Sizes')
+plt.title('Distribution of Function Length in Standard Haskell Libraries')
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
-
-# print(loc_counts)
