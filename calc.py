@@ -24,10 +24,16 @@ def count_haskell_function_loc(file_path):
         if multi_line_comment:
             continue
 
+        if "{-#" in stripped and "#-}" in stripped:
+            continue
+
+        if "::" in stripped:
+            continue
+
         # remove module declarations
         if "module " in stripped:
             module_declaration = True
-        if "where" in stripped:
+        if ") where" in stripped:
             module_declaration = False
             continue
         if module_declaration:
@@ -53,19 +59,15 @@ def count_haskell_function_loc(file_path):
         if stripped.startswith("let"):
             continue
 
-
-
-
-        # Match function definitions (without indentation)
-        match = re.match(r"^(\w+)(\s+[\w|']+)*\s*=\s", stripped)
+        match = re.match(r"^(\w+)(\s+[\w|']+)*\s*=", stripped)
         if match:
             if current_function:
                 function_locs[current_function] = loc_count
             
             current_function = match.group(1)
-            loc_count = 1  # Start new function count
+            loc_count = 1
         elif current_function:
-            loc_count += 1  # Count continued lines within the function
+            loc_count += 1
     
     if current_function:
         function_locs[current_function] = loc_count  # Add last function
@@ -73,7 +75,24 @@ def count_haskell_function_loc(file_path):
     return function_locs
 
 # Example usage
-file_path = "aeson.hs"
+file_path = "raw_lib_data.hs"
+
+with open(file_path, 'r') as f:
+    lines = f.readlines()
+
+filtered_lines = [
+    line for line in lines if not (
+        line.strip().startswith("--") 
+        or line.strip().startswith("{-")
+        or line.strip().startswith("-}")
+        or line.strip().startswith("#-}")
+        or line.strip().endswith("-}")
+    )
+]
+
+with open(file_path, 'w') as f:
+    f.writelines(filtered_lines)
+
 loc_counts = dict(sorted(count_haskell_function_loc(file_path).items(), key=lambda x: x[1], reverse=True))
 
 with open('out_raw.json', 'w') as f:
