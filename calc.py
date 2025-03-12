@@ -105,11 +105,8 @@ with open(file_path, 'w') as f:
 
 loc_counts = dict(sorted(count_haskell_function_loc(file_path).items(), key=lambda x: x[1], reverse=True))
 
-# with open('out_raw.json', 'w') as f:
-#     json.dump(loc_counts, f, indent=2)
-
-with open('out_raw.json', 'r') as f:
-    loc_counts = json.load(f)
+with open('out_raw.json', 'w') as f:
+    json.dump(loc_counts, f, indent=2)
 
 histogram = {}
 for loc in sorted(loc_counts.values()):
